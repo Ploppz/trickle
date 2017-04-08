@@ -41,7 +41,7 @@
         Name="Common"
         filter="c;cpp;cxx;cc;h;s;asm;inc"
         macros="Target=nRF51422_xxAC" />
-      <file file_name="main.c" />
+      <file file_name="src/main.c" />
     </folder>
     <configuration
       Name="Debug"
