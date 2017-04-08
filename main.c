@@ -1,39 +1,24 @@
-/*********************************************************************
-*               SEGGER MICROCONTROLLER GmbH & Co. KG                 *
-*       Solutions for real time microcontroller applications         *
-**********************************************************************
-*                                                                    *
-*       (c) 2014 - 2016  SEGGER Microcontroller GmbH & Co. KG        *
-*                                                                    *
-*       www.segger.com     Support: support@segger.com               *
-*                                                                    *
-**********************************************************************
+#include "cpu.h" // cpu_sleep
+#include "irq.h"
+#include "uart.h"
 
--------------------------- END-OF-HEADER -----------------------------
+#include "misc.h"
+#include "util.h"
+#include "mayfly.h"
 
-File    : main.c
-Purpose : Generic application start
-*/
+#include "clock.h"
+#include "cntr.h"
+#include "ticker.h"
 
-#include <stdio.h>
-#include <stdlib.h>
+#include "config.h"
+#include "debug.h"
 
-/*********************************************************************
-*
-*       main()
-*
-*  Function description
-*   Application entry point.
-*/
+static uint8_t __noinit isr_stack[256];
+static uint8_t __noinit main_stack[512];
+
+void * const isr_stack_top = isr_stack + sizeof(isr_stack);
+void * const main_stack_top = main_stack + sizeof(main_stack);
+
 void main(void) {
-  int i;
-
-  for (i = 0; i < 100; i++) {
-    printf("Hello World %d!\n", i);
-  }
-  do {
-    i++;
-  } while (1);
+  while (1) {}
 }
-
-/*************************** End of file ****************************/
