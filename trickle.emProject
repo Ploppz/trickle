@@ -30,16 +30,6 @@
       project_type="Executable"
       target_reset_script="Reset();"
       target_trace_initialize_script="EnableTrace(&quot;$(TraceInterfaceType)&quot;)" />
-    <folder Name="CMSIS Files">
-      <file file_name="nrf.h" />
-      <file file_name="system_nrf51.c">
-        <configuration
-          Name="Common"
-          default_code_section=".init"
-          default_const_section=".init_rodata" />
-      </file>
-      <configuration Name="Common" macros="Target=nRF51422_xxAC" />
-    </folder>
     <folder Name="Script Files">
       <file file_name="nRF_Target.js">
         <configuration Name="Common" file_type="Reset Script" />
@@ -53,14 +43,10 @@
         macros="Target=nRF51422_xxAC" />
       <file file_name="main.c" />
     </folder>
-    <folder Name="System Files">
-      <file file_name="thumb_crt0.s" />
-      <file file_name="nRF_Startup.s" />
-      <file file_name="nrf51_Vectors.s">
-        <configuration Name="Common" file_type="Assembly" />
-      </file>
-      <configuration Name="Common" macros="Target=nRF51422_xxAC" />
-    </folder>
+    <configuration
+      Name="Debug"
+      c_preprocessor_definitions="VERSION=fcd690c61;NRF51;CONFIG_BLUETOOTH_CONTROLLER_ROLE_ADV;CONFIG_BLUETOOTH_CONTROLLER_ROLE_OBS;CONFIG_BLUETOOTH_CONTROLLER_ROLE_SLAVE;CONFIG_BLUETOOTH_CONTROLLER_ROLE_MASTER;CONFIG_BLUETOOTH_CONTROLLER_ROLE_CONN;CONFIG_BLUETOOTH_CONTROLLER_FAST_ENC;CONFIG_BLUETOOTH_CONTROLLER_LE_PING;CONFIG_BLUETOOTH_CONTROLLER_DATA_LENGTH;CONFIG_BLUETOOTH_CONTROLLER_CONN_RSSI;CONFIG_BLUETOOTH_CONTROLLER_PROFILE_ISR;RADIO_CONNECTION_CONTEXT_MAX=4;RADIO_LL_LENGTH_OCTETS_RX_MAX=251;RADIO_PACKET_COUNT_RX_MAX=6;RADIO_PACKET_COUNT_TX_MAX=7;RADIO_PACKET_TX_DATA_SIZE=251;RADIO_MEM_MNG_SIZE=5928;DEBUG=1;UART=8"
+      c_user_include_directories=".;../PhoenixLL/external/arm/cmsis/include;../PhoenixLL/external/nordic/include;../PhoenixLL/arch/arm/cortex_m;../PhoenixLL/soc/nrf5;../PhoenixLL/hal;../PhoenixLL/util;../PhoenixLL/nanobe;../PhoenixLL/ticker;../PhoenixLL/ble/ll" />
   </project>
   <configuration
     Name="Debug"
