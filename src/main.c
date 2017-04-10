@@ -40,7 +40,7 @@ void * const main_stack_top = main_stack + sizeof(main_stack);
 #define TICKER_USER0_OP_COUNT 0
 #define TICKER_USER1_OP_COUNT 0
 #define TICKER_USER2_OP_COUNT 0
-#define TICKER_USER3_OP_COUNT 2
+#define TICKER_USER3_OP_COUNT 5
 #define TICKER_USER_OP_TOTAL (TICKER_USER0_OP_COUNT + \
                   TICKER_USER1_OP_COUNT + \
                   TICKER_USER2_OP_COUNT + \
@@ -135,6 +135,19 @@ void mayfly_pend(uint8_t caller_id, uint8_t callee_id)
     }
 }
 
+void update_has_happened(uint32_t status, void *context) {
+    static uint32_t tick;
+
+    switch ((++tick) & 1) {
+    case 0:
+        NRF_GPIO->OUTSET = (1 << 22);
+        break;
+    case 1:
+        NRF_GPIO->OUTCLR = (1 << 22);
+        break;
+    }
+}
+
 void ticker_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy,
             void *context)
 {
@@ -153,8 +166,8 @@ void ticker_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy,
             // 0xFFFF - (0xFFFF - interval) = interval
             0, 0xFFFF - interval,
             0, 0, // slot
-            0, 0,
-            0, 0);
+            0, 1, // lazy, force
+            update_has_happened, 0);
 
     switch ((++tick) & 1) {
     case 0:
