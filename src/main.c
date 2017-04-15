@@ -1,5 +1,6 @@
 #include "trickle.h"
 #include "rand.h"
+
 #include "soc.h"
 #include "cpu.h"
 #include "irq.h"
@@ -232,7 +233,7 @@ int main(void)
         , 0 /* ticker id */
         , ticker_ticks_now_get() /* anchor point */
         , TICKER_US_TO_TICKS(trickle.interval) /* first interval */
-        , TICKER_US_TO_TICKS(0xFFFF) /* periodic interval */
+        , 0xFFFF /* periodic interval */
         , TICKER_REMAINDER(0) /* remainder */
         , 0 /* lazy */
         , 0 /* slot */

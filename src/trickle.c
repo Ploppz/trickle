@@ -6,6 +6,7 @@
 uint32_t
 next_interval(trickle_t *trickle) {
     trickle->interval = min(trickle->interval * 2, trickle_config.interval_max);
+    return trickle->interval;
 }
 
 
