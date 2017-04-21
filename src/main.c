@@ -183,9 +183,7 @@ void ticker_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy,
 int main(void)
 {
     DEBUG_INIT();
-
     trickle_init(&trickle);
-
     /* Dongle RGB LED */
     NRF_GPIO->DIRSET = (1 << 21) | (1 << 22) | (1 << 23);
     NRF_GPIO->OUTSET = (1 << 21) | (1 << 22) | (1 << 23);
