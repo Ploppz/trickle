@@ -9,14 +9,15 @@ next_interval(trickle_t *trickle) {
     return trickle->interval;
 }
 
-// returns 8 bit random number from 0 to 0xFF
+// returns 8 bit random number from min to max
 uint8_t 
-rng(){
+rng(int min, int max){
+  float divisor = 0xFF / (max - min);
   * (int *) 0x4000D000 = 1; // Start task
   while (* (int *) 0x4000D100 == 0) {} // while Valrdy event == 0
   * (int *) 0x4000D004 = 1; // Stop task
-  uint8_t random_number = * (int *) 0x4000D508; // Value
-  return random_number;
+  float random_number = * (int *) 0x4000D508; // Value
+  return min + random_number / divisor;
 }
 
 
