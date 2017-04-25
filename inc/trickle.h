@@ -6,6 +6,8 @@ typedef struct {
     uint32_t c_count; // consistency counter / c
 } trickle_t;
 
+uint8_t 
+rng(int min, int max);
 
 /* Initialize trickle struct */
 uint32_t

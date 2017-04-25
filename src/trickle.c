@@ -1,4 +1,5 @@
 #include "trickle.h"
+#include "NRF.h"
 
 #define min(a,b) ((a) < (b) ? (a) : (b))
 
@@ -12,17 +13,23 @@ next_interval(trickle_t *trickle) {
 // returns 8 bit random number from min to max
 uint8_t 
 rng(int min, int max){
-  float divisor = 0xFF / (max - min);
-  * (int *) 0x4000D000 = 1; // Start task
-  while (* (int *) 0x4000D100 == 0) {} // while Valrdy event == 0
-  * (int *) 0x4000D004 = 1; // Stop task
-  float random_number = * (int *) 0x4000D508; // Value
-  return min + random_number / divisor;
+  NRF_RNG->EVENTS_VALRDY = 0;
+  NRF_RNG->TASKS_START = 1;
+  while(NRF_RNG->EVENTS_VALRDY == 0){
+    // Wait for value to be ready
+  }
+  uint32_t random_number = NRF_RNG->VALUE;
+  NRF_RNG->TASKS_STOP = 1;
+  while(NRF_RNG->TASKS_START == 1){
+    //wait for rng to stop
+  }
+  random_number *= max - min;
+  random_number /= 0xFF;
+  return min + random_number;
 }
-
 
 uint32_t
 trickle_init(trickle_t *trickle) {
-    trickle->interval = trickle_config.interval_min /* TODO random */;
+    trickle->interval = trickle_config.interval_min;
     trickle->c_count = 0;
 }
