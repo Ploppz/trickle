@@ -10,8 +10,7 @@ next_interval(trickle_t *trickle) {
     return trickle->interval;
 }
 
-// returns 8 bit random number from min to max
-uint8_t 
+uint32_t 
 rng(int min, int max){
   NRF_RNG->EVENTS_VALRDY = 0;
   NRF_RNG->TASKS_START = 1;
