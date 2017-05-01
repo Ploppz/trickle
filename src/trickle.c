@@ -10,12 +10,12 @@ next_interval(trickle_t *trickle) {
     return trickle->interval;
 }
 
-uint32_t
+uint16_t
 next_t(trickle_t *trickle){
   return rng(trickle->interval/2, trickle->interval-1);
 }
 
-uint32_t 
+uint16_t 
 rng(int min, int max){
   NRF_RNG->EVENTS_VALRDY = 0;
   NRF_RNG->TASKS_START = 1;

@@ -14,8 +14,6 @@
 #include "cntr.h"
 #include "ticker.h"
 
-#include "config.h"
-
 #include "debug.h"
 
 trickle_config_t trickle_config = {

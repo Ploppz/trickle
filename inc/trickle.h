@@ -7,11 +7,11 @@ typedef struct {
 } trickle_t;
 
 /* Returns the next t value for a trickle instance */
-uint32_t
+uint16_t
 next_t(trickle_t *trickle);
 
 /* returns random number from min to max */
-uint32_t 
+uint16_t 
 rng(int min, int max);
 
 /* Initialize trickle struct */
