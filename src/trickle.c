@@ -12,7 +12,7 @@ next_interval(trickle_t *trickle) {
 
 uint32_t
 get_t_value(trickle_t *trickle){
-  return rng(trickle->interval/2, trickle->interval-1) 
+  return rng(trickle->interval/2, trickle->interval-1);
 }
 
 uint32_t 
