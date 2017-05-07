@@ -1,5 +1,5 @@
 #include "trickle.h"
-#include "NRF.h"
+#include "nrf.h"
 
 #define min(a,b) ((a) < (b) ? (a) : (b))
 
