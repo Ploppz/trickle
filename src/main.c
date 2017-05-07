@@ -14,7 +14,6 @@
 #include "cntr.h"
 #include "ticker.h"
 
-#include "config.h"
 
 #include "debug.h"
 

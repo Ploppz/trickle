@@ -49,29 +49,29 @@
       arm_linker_stack_size="2000"
       c_additional_options="-mcpu=cortex-m0;-mthumb;-fdata-sections;-ffunction-sections;-g"
       c_preprocessor_definitions="VERSION=fcd690c61;NRF51;CONFIG_BLUETOOTH_CONTROLLER_ROLE_ADV;CONFIG_BLUETOOTH_CONTROLLER_ROLE_OBS;CONFIG_BLUETOOTH_CONTROLLER_ROLE_SLAVE;CONFIG_BLUETOOTH_CONTROLLER_ROLE_MASTER;CONFIG_BLUETOOTH_CONTROLLER_ROLE_CONN;CONFIG_BLUETOOTH_CONTROLLER_FAST_ENC;CONFIG_BLUETOOTH_CONTROLLER_LE_PING;CONFIG_BLUETOOTH_CONTROLLER_DATA_LENGTH;CONFIG_BLUETOOTH_CONTROLLER_CONN_RSSI;CONFIG_BLUETOOTH_CONTROLLER_PROFILE_ISR;RADIO_CONNECTION_CONTEXT_MAX=4;RADIO_LL_LENGTH_OCTETS_RX_MAX=251;RADIO_PACKET_COUNT_RX_MAX=6;RADIO_PACKET_COUNT_TX_MAX=7;RADIO_PACKET_TX_DATA_SIZE=251;RADIO_MEM_MNG_SIZE=5928;DEBUG=1;UART=8"
-      c_user_include_directories=".;inc;../PhoenixLL;../PhoenixLL/external/arm/cmsis/include;../PhoenixLL/external/nordic/include;../PhoenixLL/arch/arm/cortex_m;../PhoenixLL/soc/nrf5;../PhoenixLL/hal;../PhoenixLL/util;../PhoenixLL/nanobe;../PhoenixLL/ticker;../PhoenixLL/ble/ll"
-      link_linker_script_file="../PhoenixLL/arch/arm/cortex_m/link.lds"
+      c_user_include_directories=".;inc;PhoenixLL;PhoenixLL/external/arm/cmsis/include;PhoenixLL/external/nordic/include;PhoenixLL/arch/arm/cortex_m;PhoenixLL/soc/nrf5;PhoenixLL/hal;PhoenixLL/util;PhoenixLL/nanobe;PhoenixLL/ticker;PhoenixLL/ble/ll"
+      link_linker_script_file="PhoenixLL/arch/arm/cortex_m/link.lds"
       link_use_linker_script_file="Yes"
       linker_output_format="hex" />
     <folder Name="asm">
-      <file file_name="../PhoenixLL/arch/arm/cortex_m/startup.s" />
-      <file file_name="../PhoenixLL/soc/nrf5/soc_isr.s" />
-      <file file_name="../PhoenixLL/soc/nrf5/soc.s" />
+      <file file_name="PhoenixLL/arch/arm/cortex_m/startup.s" />
+      <file file_name="PhoenixLL/soc/nrf5/soc_isr.s" />
+      <file file_name="PhoenixLL/soc/nrf5/soc.s" />
     </folder>
     <folder Name="PhoenixLL">
-      <file file_name="../PhoenixLL/soc/nrf5/soc_c.c" />
-      <file file_name="../PhoenixLL/hal/nrf5/clock.c" />
-      <file file_name="../PhoenixLL/hal/nrf5/cntr.c" />
-      <file file_name="../PhoenixLL/hal/nrf5/ecb.c" />
-      <file file_name="../PhoenixLL/hal/nrf5/radio.c" />
-      <file file_name="../PhoenixLL/hal/nrf5/rand.c" />
-      <file file_name="../PhoenixLL/hal/nrf5/uart.c" />
-      <file file_name="../PhoenixLL/util/mayfly.c" />
-      <file file_name="../PhoenixLL/util/mem.c" />
-      <file file_name="../PhoenixLL/util/memq.c" />
-      <file file_name="../PhoenixLL/util/string.c" />
-      <file file_name="../PhoenixLL/util/util.c" />
-      <file file_name="../PhoenixLL/ticker/ticker.c" />
+      <file file_name="PhoenixLL/soc/nrf5/soc_c.c" />
+      <file file_name="PhoenixLL/hal/nrf5/clock.c" />
+      <file file_name="PhoenixLL/hal/nrf5/cntr.c" />
+      <file file_name="PhoenixLL/hal/nrf5/ecb.c" />
+      <file file_name="PhoenixLL/hal/nrf5/radio.c" />
+      <file file_name="PhoenixLL/hal/nrf5/rand.c" />
+      <file file_name="PhoenixLL/hal/nrf5/uart.c" />
+      <file file_name="PhoenixLL/util/mayfly.c" />
+      <file file_name="PhoenixLL/util/mem.c" />
+      <file file_name="PhoenixLL/util/memq.c" />
+      <file file_name="PhoenixLL/util/string.c" />
+      <file file_name="PhoenixLL/util/util.c" />
+      <file file_name="PhoenixLL/ticker/ticker.c" />
     </folder>
   </project>
   <configuration
