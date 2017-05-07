@@ -10,6 +10,10 @@ typedef struct {
 uint32_t 
 rng(int min, int max);
 
+/* get t value */
+uint32_t
+get_t_value(trickle_t *trickle);
+
 /* Initialize trickle struct */
 uint32_t
 trickle_init(trickle_t *trickle);
