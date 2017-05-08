@@ -1,0 +1,4 @@
+syn keyword CTagsImport sys API Hex
+syn keyword CTagsGlobalVariable hex_file_path
+syn keyword CTagsFunction flash
+
