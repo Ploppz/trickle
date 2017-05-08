@@ -83,7 +83,7 @@ void ticker_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy,
 
 
     uint32_t interval = next_interval(&trickle);
-    ticker_update(0, 3, 0, // instance, user, ticker_id
+    ticker_update(0, 3, 10, // instance, user, ticker_id
             // drift plus, drift minus:
             // Notice that the periodic interval is set to 0xFFFF
             // 0xFFFF - (0xFFFF - interval) = interval
@@ -316,8 +316,8 @@ int main(void)
     {
         uint8_t own_bdaddr[BDADDR_SIZE] = {0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff};
         uint8_t own_bdaddr_type = 1;
-        uint8_t adv_data[] = {1,2,3,4};
-        //uint8_t adv_data[] = {0x02, 0x01, 0x06, 0x0B, 0x08, 'P', 'h', 'o', 'e', 'n', 'i', 'x', ' ', 'L', 'L'};
+        //uint8_t adv_data[] = {1,2,3,4};
+        uint8_t adv_data[] = {0x02, 0x01, 0x06, 0x0B, 0x08, 'P', 'h', 'o', 'e', 'n', 'i', 'x', ' ', 'L', 'L'};
         uint8_t scn_data[] = {0x02, 0x01, 0x06, 0x0B, 0x08, 'P', 'h', 'o', 'e', 'n', 'i', 'x', ' ', 'L', 'L'};
         //uint8_t scn_data[] = {0x03, 0x02, 0x02, 0x18};
 
@@ -333,8 +333,8 @@ int main(void)
     ll_scan_params_set(1, SCAN_INTERVAL, SCAN_WINDOW, 1, SCAN_FILTER_POLICY);
 
 
-
-    ticker_start(0 /* instance */
+#if 0
+    retval = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO /* instance */
         , 3 /* user */
         , 10 /* ticker id */
         , ticker_ticks_now_get() /* anchor point */
@@ -348,8 +348,14 @@ int main(void)
         , 0 /* op func */
         , 0 /* op context */
         );
+        ASSERT(!retval);
+#endif
 
-    retval = ll_adv_enable(1);
+    ASSERT(!retval);
+
+    retval = ll_adv_one_shot(1);
+    ASSERT(!retval);
+    retval = ll_adv_one_shot(1);
     ASSERT(!retval);
 
     #if 0
@@ -359,6 +365,7 @@ int main(void)
     #endif
 
     while (1) {
+    /*
         int a = 0;
         uint16_t handle = 0;
         struct radio_pdu_node_rx *node_rx = 0;
@@ -375,5 +382,6 @@ int main(void)
             a = 0;
         }
         int c = 1;
+        */
     }
 }
