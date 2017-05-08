@@ -8,7 +8,7 @@ typedef struct {
 
 /* returns random number from min to max */
 uint32_t 
-rng(int min, int max);
+rand(int min, int max);
 
 /* get t value */
 uint32_t

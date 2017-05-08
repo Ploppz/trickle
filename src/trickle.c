@@ -12,11 +12,11 @@ next_interval(trickle_t *trickle) {
 
 uint32_t
 get_t_value(trickle_t *trickle){
-    return rng(trickle->interval/2, trickle->interval-1);
+    return rand(trickle->interval/2, trickle->interval-1);
 }
 
 uint32_t 
-rng(int min, int max){
+rand(int min, int max){
     NRF_RNG->EVENTS_VALRDY = 0;
     NRF_RNG->TASKS_START = 1;
     while(NRF_RNG->EVENTS_VALRDY == 0){
@@ -25,7 +25,7 @@ rng(int min, int max){
     uint32_t random_number = NRF_RNG->VALUE;
     NRF_RNG->TASKS_STOP = 1;
     while(NRF_RNG->TASKS_START == 1){
-      //wait for rng to stop
+      //wait for rand to stop
     }
     random_number *= max - min;
     random_number /= 0xFF;
