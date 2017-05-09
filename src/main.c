@@ -252,6 +252,8 @@ void init_ppi() {
     NRF_PPI->CHENSET = (1 << PPI_CH0) | (1 << PPI_CH1) | (1 << PPI_CH2);
 }
 
+//TODO button press increase trickle instance v_nr (version number)
+
 uint32_t low_mask(uint8_t n) {
   return (1<<(n+1)) - 1;
 }

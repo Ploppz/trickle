@@ -4,6 +4,7 @@
 typedef struct {
     uint32_t interval;  // interval in microseconds / I
     uint32_t c_count;   // consistency counter / c
+    uint32_t v_nr;      // data version number
 } trickle_t;
 
 /* returns random number from min to max */
