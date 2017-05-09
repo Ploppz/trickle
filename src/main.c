@@ -1,4 +1,5 @@
 #include "trickle.h"
+#include "tx.h"
 
 #include "soc.h"
 #include "cpu.h"
@@ -63,6 +64,9 @@ trickle_config_t trickle_config = {
 };
 trickle_t trickle;
 
+
+uint8_t adv_packet[200];
+
 // Ticker timeouts
 void update_has_happened(uint32_t status, void *context);
 void trickle_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context);
@@ -88,6 +92,8 @@ int main(void)
 
     NRF_GPIO->DIRSET = (1 << 15);
     NRF_GPIO->OUTSET = (1 << 15);
+
+
     init_ppi();
 
     /* Mayfly shall be initialized before any ISR executes */
@@ -132,43 +138,48 @@ int main(void)
     irq_priority_set(RADIO_IRQn, CONFIG_BLUETOOTH_CONTROLLER_WORKER_PRIO);
 
 
-    /* initialise address, adv and scan data */
-    {
-        uint8_t own_bdaddr[BDADDR_SIZE] = {0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff};
-        uint8_t own_bdaddr_type = 1;
-        //uint8_t adv_data[] = {1,2,3,4};
-        uint8_t adv_data[] = {0x02, 0x01, 0x06, 0x0B, 0x08, 'P', 'h', 'o', 'e', 'n', 'i', 'x', ' ', 'L', 'L'};
-        uint8_t scn_data[] = {0x02, 0x01, 0x06, 0x0B, 0x08, 'P', 'h', 'o', 'e', 'n', 'i', 'x', ' ', 'L', 'L'};
-        //uint8_t scn_data[] = {0x03, 0x02, 0x02, 0x18};
+    uint8_t dev_addr[] = {0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff};
+    address_type_t addr_type = ADDR_RANDOM;
+    uint8_t adv_data[] = {0x02, 0x01, 0x06, 0x0B, 0x08, 'P', 'h', 'o', 'e', 'n', 'i', 'x', ' ', 'L', 'L'};
 
-        ll_address_set(own_bdaddr_type, own_bdaddr);
-
-        ll_scan_data_set(sizeof(scn_data), scn_data);
-
-        ll_adv_data_set(sizeof(adv_data), adv_data);
-    }
+    make_pdu_packet(PDU_TYPE_ADV_IND, adv_data, sizeof(adv_data), adv_packet, addr_type, dev_addr);
 
     /* initialise adv and scan params */
     ll_adv_params_set(0x300, PDU_ADV_TYPE_ADV_IND, 0x01, 0, 0, 0x07, ADV_FILTER_POLICY);
     ll_scan_params_set(1, SCAN_INTERVAL, SCAN_WINDOW, 1, SCAN_FILTER_POLICY);
 
 
-    retval = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO /* instance */
-        , 3 /* user */
-        , TICKER_ID_TRICKLE /* ticker id */
-        , ticker_ticks_now_get() /* anchor point */
-        , TICKER_US_TO_TICKS(trickle.interval) /* first interval */
-        , 0xFFFF /* periodic interval */
-        , TICKER_REMAINDER(0) /* remainder */
-        , 0 /* lazy */
-        , 0 /* slot */
-        , trickle_timeout /* timeout callback function */
-        , 0 /* context */
-        , 0 /* op func */
-        , 0 /* op context */
+    /*
+    retval = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO // instance
+        , 3 // user
+        , TICKER_ID_TRICKLE // ticker id
+        , ticker_ticks_now_get() // anchor point
+        , TICKER_US_TO_TICKS(trickle.interval) // first interval
+        , 0xFFFF // periodic interval
+        , TICKER_REMAINDER(0) // remainder
+        , 0 // lazy
+        , 0 // slot
+        , trickle_timeout // timeout callback function
+        , 0 // context
+        , 0 // op func
+        , 0 // op context
         );
         ASSERT(!retval);
+        */
 
+
+    // TODO Testing only transmission, we have to do these steps.
+    // TODO It will most likely work without these as soon as scanning is enabled?
+    // TODO The question is how well it works to set the PACKETPTR & SHORTS while also scanning.
+    {
+        // Enable HFCLK
+        NRF_CLOCK->EVENTS_HFCLKSTARTED = 0;
+        NRF_CLOCK->TASKS_HFCLKSTART = 1;
+        while (NRF_CLOCK->EVENTS_HFCLKSTARTED == 0) {}
+
+        configure_radio(adv_packet, 37, ADV_CH37);
+        transmit(adv_packet);
+    }
 
     #if 0
     retval = ll_scan_enable(1);
@@ -266,7 +277,9 @@ void request_transmission() {
 }
 
 void transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context) {
-    // TODO actually transmit
+    // Transmission
+    transmit(adv_packet);
+    // Debugging
     static uint32_t tick;
     int a = 0;
     switch ((++tick) & 1) {

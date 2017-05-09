@@ -43,6 +43,7 @@
         macros="Target=nRF51422_xxAC" />
       <file file_name="src/main.c" />
       <file file_name="src/trickle.c" />
+      <file file_name="src/tx.c" />
     </folder>
     <configuration
       Name="Debug"
