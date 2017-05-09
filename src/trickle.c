@@ -13,14 +13,21 @@ next_interval(trickle_t *trickle) {
 uint32_t
 get_t_value(trickle_t *trickle){
     uint32_t rand_num = rand(trickle->interval/2, trickle->interval-1);
-    trickle->t_timer = rand_num;
     return rand_num;
 }
 
 
 uint32_t
 get_next_radio_drift(trickle_t *trickle){
-    return  get_t_value(trickle) - (2 * trickle->t_timer - trickle->interval/2);
+    if(trickle->t_timer == 0){
+        uint32_t rand_num = get_t_value(trickle);
+        trickle->t_timer = rand_num;
+        return rand_num;
+    }
+    uint32_t rand_num = get_t_value(trickle);
+    uint32_t retval = (rand_num - (2 * trickle->t_timer - trickle->interval/2));
+    trickle->t_timer = rand_num;
+    return  retval;
 }
 
 uint32_t 

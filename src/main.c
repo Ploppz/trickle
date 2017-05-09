@@ -32,7 +32,7 @@ void * const main_stack_top = main_stack + sizeof(main_stack);
 static uint8_t ALIGNED(4) ticker_nodes[RADIO_TICKER_NODES][TICKER_NODE_T_SIZE];
 static uint8_t ALIGNED(4) ticker_users[MAYFLY_CALLER_COUNT][TICKER_USER_T_SIZE];
 static uint8_t ALIGNED(4) ticker_user_ops[RADIO_TICKER_USER_OPS]
-                        [TICKER_USER_OP_T_SIZE];
+                        [TICKER_USER_OP_T_SIZE+1];
 
 static uint8_t ALIGNED(4) rng[3 + 4 + 1];
 
@@ -74,6 +74,7 @@ void update_has_happened(uint32_t status, void *context) {
 void ticker_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy,
             void *context)
 {
+    uint32_t retval;
     static uint32_t tick;
 
     (void)ticks_at_expire;
@@ -83,7 +84,7 @@ void ticker_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy,
 
 
     uint32_t interval = next_interval(&trickle);
-    ticker_update(0, 3, 10, // instance, user, ticker_id
+    retval = ticker_update(0, 3, 10, // instance, user, ticker_id
             // drift plus, drift minus:
             // Notice that the periodic interval is set to 0xFFFF
             // 0xFFFF - (0xFFFF - interval) = interval
@@ -92,18 +93,20 @@ void ticker_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy,
             0, 1, // lazy, force
             update_has_happened, 0);
 
-
-    uint32_t drift = 0x100;
-        ticker_update(RADIO_TICKER_INSTANCE_ID_RADIO, RADIO_TICKER_USER_ID_APP, RADIO_TICKER_ID_ADV, // instance, user, ticker_id
+    uint32_t drift = get_next_radio_drift(&trickle);
+    retval = ticker_update(RADIO_TICKER_INSTANCE_ID_RADIO, RADIO_TICKER_USER_ID_APP, RADIO_TICKER_ID_ADV, // instance, user, ticker_id
             // drift plus, drift minus:
             // Notice that the periodic interval is set to 0xFFFF
             // 0xFFFF - (0xFFFF - interval) = interval
-            get_next_radio_drift(&trickle), 0,
+            10000, 0,
             0, 0, // slot
             0, 1, // lazy, force
             0, 0);
 
-            drift += 0x100;
+        
+
+
+
     switch ((++tick) & 1) {
     case 0:
         NRF_GPIO->OUTSET = (1 << 21);
@@ -342,7 +345,8 @@ int main(void)
     }
 
     /* initialise adv and scan params */
-    ll_adv_params_set(get_t_value(&trickle), PDU_ADV_TYPE_ADV_IND, 0x01, 0, 0, 0x07, ADV_FILTER_POLICY);
+    uint32_t t_timer = get_next_radio_drift(&trickle);
+    ll_adv_params_set(t_timer, PDU_ADV_TYPE_ADV_IND, 0x01, 0, 0, 0x07, ADV_FILTER_POLICY);
     ll_scan_params_set(1, SCAN_INTERVAL, SCAN_WINDOW, 1, SCAN_FILTER_POLICY);
 
 
