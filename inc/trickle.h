@@ -2,13 +2,19 @@
 
 /* Trickle instance */
 typedef struct {
-    uint32_t interval; // interval in microseconds / I
-    uint32_t c_count; // consistency counter / c
+    uint32_t interval;  // interval in microseconds / I
+    uint32_t c_count;   // consistency counter / c
 } trickle_t;
 
 /* returns random number from min to max */
 uint32_t 
 rand(int min, int max);
+
+void
+increment_c(trickle_t *trickle);
+
+void
+reset_i_value(trickle_t *trickle);
 
 /* get t value */
 uint32_t
@@ -27,9 +33,9 @@ next_interval(trickle_t *trickle);
 
 /* Configuration, which should be global to the node */
 typedef struct {
-    uint32_t interval_min; // in microseconds
-    uint32_t interval_max; // in microseconds
-    uint32_t c_constant; // consistency constant / k
+    uint32_t interval_min;  // in microseconds
+    uint32_t interval_max;  // in microseconds
+    uint32_t c_constant;    // consistency constant / k
 } trickle_config_t;
 
 extern trickle_config_t trickle_config;

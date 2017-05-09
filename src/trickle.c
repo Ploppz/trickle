@@ -10,6 +10,18 @@ next_interval(trickle_t *trickle) {
     return trickle->interval;
 }
 
+void
+increment_c(trickle_t *trickle){
+    if(trickle->c_count >= trickle_config.c_constant){
+        trickle->interval = rand(trickle_config.interval_min, trickle_config.interval_max);
+    }
+}
+
+void
+reset_i_value(trickle_t *trickle){
+    trickle->interval = trickle_config.interval_min;
+}
+
 uint32_t
 get_t_value(trickle_t *trickle){
     return rand(trickle->interval/2, trickle->interval-1);
