@@ -28,9 +28,15 @@ uint8_t __noinit main_stack[512];
 void * const isr_stack_top = isr_stack + sizeof(isr_stack);
 void * const main_stack_top = main_stack + sizeof(main_stack);
 
-static uint8_t ALIGNED(4) ticker_nodes[RADIO_TICKER_NODES][TICKER_NODE_T_SIZE];
+#define TICKER_NODES (RADIO_TICKER_NODES+2)
+#define TICKER_USER_WORKER_OPS ( RADIO_TICKER_USER_WORKER_OPS)
+#define TICKER_USER_JOB_OPS (RADIO_TICKER_USER_JOB_OPS)
+#define TICKER_USER_APP_OPS (RADIO_TICKER_USER_APP_OPS)
+#define TICKER_USER_OPS (TICKER_USER_WORKER_OPS + TICKER_USER_JOB_OPS + TICKER_USER_APP_OPS)
+
+static uint8_t ALIGNED(4) ticker_nodes[TICKER_NODES][TICKER_NODE_T_SIZE];
 static uint8_t ALIGNED(4) ticker_users[MAYFLY_CALLER_COUNT][TICKER_USER_T_SIZE];
-static uint8_t ALIGNED(4) ticker_user_ops[RADIO_TICKER_USER_OPS]
+static uint8_t ALIGNED(4) ticker_user_ops[TICKER_USER_OPS]
                         [TICKER_USER_OP_T_SIZE];
 static uint8_t ALIGNED(4) rng[3 + 4 + 1];
 static uint8_t ALIGNED(4) radio[RADIO_MEM_MNG_SIZE];
@@ -45,6 +51,11 @@ static uint8_t ALIGNED(4) radio[RADIO_MEM_MNG_SIZE];
 #define ADV_FILTER_POLICY  0x00
 #define SCAN_FILTER_POLICY 0x00
 
+#define TICKER_ID_TRICKLE (RADIO_TICKER_NODES + 1)
+#define TICKER_ID_TRANSMISSION (RADIO_TICKER_NODES + 2)
+
+#define TRANSMISSION_TIME TICKER_US_TO_TICKS(500) // TODO more accurate - what do we need
+
 trickle_config_t trickle_config = {
     .interval_min = 0xFF,
     .interval_max = 0xFFFF,
@@ -52,9 +63,14 @@ trickle_config_t trickle_config = {
 };
 trickle_t trickle;
 
-void toggle_line(uint32_t line);
+// Ticker timeouts
 void update_has_happened(uint32_t status, void *context);
-void ticker_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context);
+void trickle_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context);
+void transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context);
+
+// Other helpers
+void request_transmission();
+void toggle_line(uint32_t line);
 void gpiote_out_init(uint32_t index, uint32_t pin, uint32_t polarity, uint32_t init_val);
 void init_ppi();
 uint32_t low_mask(uint8_t n);
@@ -67,8 +83,8 @@ int main(void)
     DEBUG_INIT();
 
     /* Dongle RGB LED */
-    NRF_GPIO->DIRSET = (1 << 21) | (1 << 22);
-    NRF_GPIO->OUTCLR = (1 << 21) | (1 << 22);
+    NRF_GPIO->DIRSET = (1 << 21) | (1 << 22) | (1 << 23) | (1 << 24);
+    NRF_GPIO->OUTCLR = (1 << 21) | (1 << 22) | (1 << 23) | (1 << 24);
 
     NRF_GPIO->DIRSET = (1 << 15);
     NRF_GPIO->OUTSET = (1 << 15);
@@ -89,10 +105,10 @@ int main(void)
     irq_priority_set(SWI4_IRQn, CONFIG_BLUETOOTH_CONTROLLER_JOB_PRIO);
     irq_enable(SWI4_IRQn);
 
-    ticker_users[MAYFLY_CALL_ID_0][0] = RADIO_TICKER_USER_WORKER_OPS;
-    ticker_users[MAYFLY_CALL_ID_1][0] = RADIO_TICKER_USER_JOB_OPS;
+    ticker_users[MAYFLY_CALL_ID_0][0] = TICKER_USER_WORKER_OPS;
+    ticker_users[MAYFLY_CALL_ID_1][0] = TICKER_USER_JOB_OPS;
     ticker_users[MAYFLY_CALL_ID_2][0] = 0;
-    ticker_users[MAYFLY_CALL_ID_PROGRAM][0] = RADIO_TICKER_USER_APP_OPS;
+    ticker_users[MAYFLY_CALL_ID_PROGRAM][0] = TICKER_USER_APP_OPS;
 
     ticker_init(RADIO_TICKER_INSTANCE_ID_RADIO, RADIO_TICKER_NODES,
             &ticker_nodes[0], MAYFLY_CALLER_COUNT, &ticker_users[0],
@@ -137,23 +153,21 @@ int main(void)
     ll_scan_params_set(1, SCAN_INTERVAL, SCAN_WINDOW, 1, SCAN_FILTER_POLICY);
 
 
-#if 1
     retval = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO /* instance */
         , 3 /* user */
-        , 8 /* ticker id */
+        , TICKER_ID_TRICKLE /* ticker id */
         , ticker_ticks_now_get() /* anchor point */
         , TICKER_US_TO_TICKS(trickle.interval) /* first interval */
         , 0xFFFF /* periodic interval */
         , TICKER_REMAINDER(0) /* remainder */
         , 0 /* lazy */
         , 0 /* slot */
-        , ticker_timeout /* timeout callback function */
+        , trickle_timeout /* timeout callback function */
         , 0 /* context */
         , 0 /* op func */
         , 0 /* op context */
         );
         ASSERT(!retval);
-#endif
 
 
     #if 0
@@ -202,9 +216,7 @@ void update_has_happened(uint32_t status, void *context) {
     }
 }
 
-void ticker_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy,
-            void *context)
-{
+void trickle_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context) {
     static uint32_t tick;
 
     (void)ticks_at_expire;
@@ -214,7 +226,7 @@ void ticker_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy,
 
 
     uint32_t interval = next_interval(&trickle);
-    ticker_update(0, 3, 10, // instance, user, ticker_id
+    ticker_update(0, 3, TICKER_ID_TRICKLE, // instance, user, ticker_id
             // drift plus, drift minus:
             // Notice that the periodic interval is set to 0xFFFF
             // 0xFFFF - (0xFFFF - interval) = interval
@@ -231,8 +243,41 @@ void ticker_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy,
         NRF_GPIO->OUTCLR = (1 << 21);
         break;
     }
+
+    request_transmission();
 }
 
+void request_transmission() {
+    uint32_t retval = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO // instance
+        , 0 // user
+        , TICKER_ID_TRANSMISSION // ticker id
+        , ticker_ticks_now_get() // anchor point
+        , 0 // first interval
+        , 0 // periodic interval
+        , 0 // remainder
+        , 0 // lazy
+        , TRANSMISSION_TIME // slot
+        , transmit_timeout // timeout callback function
+        , 0 // context
+        , 0 // op func
+        , 0 // op context
+        );
+    ASSERT(retval == 2);
+}
+
+void transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context) {
+    // TODO actually transmit
+    static uint32_t tick;
+    int a = 0;
+    switch ((++tick) & 1) {
+    case 0:
+        NRF_GPIO->OUTSET = (1 << 23);
+        break;
+    case 1:
+        NRF_GPIO->OUTCLR = (1 << 23);
+        break;
+    }
+}
 
 
 
