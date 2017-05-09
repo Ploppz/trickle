@@ -12,7 +12,15 @@ next_interval(trickle_t *trickle) {
 
 uint32_t
 get_t_value(trickle_t *trickle){
-    return rand(trickle->interval/2, trickle->interval-1);
+    uint32_t rand_num = rand(trickle->interval/2, trickle->interval-1);
+    trickle->t_timer = rand_num;
+    return rand_num;
+}
+
+
+uint32_t
+get_next_radio_drift(trickle_t *trickle){
+    return  get_t_value(trickle) - (2 * trickle->t_timer - trickle->interval/2);
 }
 
 uint32_t 
@@ -36,4 +44,5 @@ uint32_t
 trickle_init(trickle_t *trickle) {
     trickle->interval = trickle_config.interval_min;
     trickle->c_count = 0;
+    trickle->t_timer = 0;
 }

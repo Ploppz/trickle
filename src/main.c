@@ -87,11 +87,23 @@ void ticker_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy,
             // drift plus, drift minus:
             // Notice that the periodic interval is set to 0xFFFF
             // 0xFFFF - (0xFFFF - interval) = interval
-            0, 0xFFFF - interval,
+            (interval - trickle_config.interval_min), 0,
             0, 0, // slot
             0, 1, // lazy, force
             update_has_happened, 0);
 
+
+    uint32_t drift = 0x100;
+        ticker_update(RADIO_TICKER_INSTANCE_ID_RADIO, RADIO_TICKER_USER_ID_APP, RADIO_TICKER_ID_ADV, // instance, user, ticker_id
+            // drift plus, drift minus:
+            // Notice that the periodic interval is set to 0xFFFF
+            // 0xFFFF - (0xFFFF - interval) = interval
+            get_next_radio_drift(&trickle), 0,
+            0, 0, // slot
+            0, 1, // lazy, force
+            0, 0);
+
+            drift += 0x100;
     switch ((++tick) & 1) {
     case 0:
         NRF_GPIO->OUTSET = (1 << 21);
@@ -258,13 +270,14 @@ uint32_t low_mask(uint8_t n) {
 
 int main(void)
 {
+    trickle_init(&trickle);
     uint32_t retval;
 
     DEBUG_INIT();
 
     /* Dongle RGB LED */
-    NRF_GPIO->DIRSET = (1 << 13) | (1 << 14);
-    NRF_GPIO->OUTCLR = (1 << 13) | (1 << 14);
+    NRF_GPIO->DIRSET = (1 << 13) | (1 << 14) | (1 << 21);
+    NRF_GPIO->OUTCLR = (1 << 13) | (1 << 14) | (1 << 21);
 
     NRF_GPIO->DIRSET = (1 << 15);
     NRF_GPIO->OUTSET = (1 << 15);
@@ -329,17 +342,17 @@ int main(void)
     }
 
     /* initialise adv and scan params */
-    ll_adv_params_set(0x300, PDU_ADV_TYPE_ADV_IND, 0x01, 0, 0, 0x07, ADV_FILTER_POLICY);
+    ll_adv_params_set(get_t_value(&trickle), PDU_ADV_TYPE_ADV_IND, 0x01, 0, 0, 0x07, ADV_FILTER_POLICY);
     ll_scan_params_set(1, SCAN_INTERVAL, SCAN_WINDOW, 1, SCAN_FILTER_POLICY);
 
 
-#if 0
+#if 1
     retval = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO /* instance */
         , 3 /* user */
         , 10 /* ticker id */
         , ticker_ticks_now_get() /* anchor point */
-        , TICKER_US_TO_TICKS(trickle.interval) /* first interval */
-        , 0xFFFF /* periodic interval */
+        , TICKER_US_TO_TICKS(trickle_config.interval_min) /* first interval */
+        , trickle_config.interval_min /* periodic interval */
         , TICKER_REMAINDER(0) /* remainder */
         , 0 /* lazy */
         , 0 /* slot */
@@ -353,9 +366,7 @@ int main(void)
 
     ASSERT(!retval);
 
-    retval = ll_adv_one_shot(1);
-    ASSERT(!retval);
-    retval = ll_adv_one_shot(1);
+    retval = ll_adv_enable(1);
     ASSERT(!retval);
 
     #if 0
