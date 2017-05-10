@@ -152,6 +152,8 @@ int main(void)
     ll_adv_params_set(0x300, PDU_ADV_TYPE_ADV_IND, 0x01, 0, 0, 0x07, ADV_FILTER_POLICY);
     ll_scan_params_set(1, SCAN_INTERVAL, SCAN_WINDOW, 1, SCAN_FILTER_POLICY);
 
+    transmit(adv_packet);
+    /* request_transmission(); */
 
     retval = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO // instance
         , 3 // user
@@ -232,7 +234,7 @@ void op_callback3(uint32_t status, void *context) {
 void trickle_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context) {
 
     uint32_t interval = next_interval(&trickle);
-    ticker_update(0, 3, TICKER_ID_TRICKLE, // instance, user, ticker_id
+    ticker_update(RADIO_TICKER_INSTANCE_ID_RADIO, 3, TICKER_ID_TRICKLE, // instance, user, ticker_id
             // drift plus, drift minus:
             // Notice that the periodic interval is set to 0xFFFF
             // 0xFFFF - (0xFFFF - interval) = interval
@@ -249,7 +251,7 @@ void trickle_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy
 void request_transmission() {
     uint32_t retval = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO // instance
         , 0 // user
-        , TICKER_ID_TRANSMISSION // ticker id
+        , 0 // ticker id
         , ticker_ticks_now_get() // anchor point
         , 0 // first interval
         , 0 // periodic interval
@@ -261,7 +263,7 @@ void request_transmission() {
         , op_callback2 // op func
         , 0 // op context
         );
-    ASSERT(retval == 2);
+    int a = 0;
 }
 
 void transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context) {
