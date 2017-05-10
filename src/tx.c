@@ -70,13 +70,45 @@ void make_pdu_packet(uint8_t pdu_type, uint8_t *data, uint32_t data_len, uint8_t
     memcpy(dest + 3 + ADVA_SIZE, data, data_len);
 }
 
+void disable_radio() {
+    // If not already disabled, disable radio
+    switch (NRF_RADIO->STATE) {
+        case 0:
+            break;
+        case 1: // rx rampup
+        case 2: // rx idle
+            break;
+        case 3: // rx
+            NRF_RADIO->EVENTS_DISABLED = 0;
+            NRF_RADIO->TASKS_DISABLE = 1;
+
+            while (NRF_RADIO->EVENTS_DISABLED == 0) {}
+            break;
+    }
+}
 
 void transmit(uint8_t *adv_packet, uint8_t rf_channel) {
     NRF_RADIO->FREQUENCY = freq_mhz(rf_channel) - FREQ_BASE;
     NRF_RADIO->PACKETPTR = (uint32_t) adv_packet;
-    NRF_RADIO->SHORTS |= 1 << RADIO_SHORTS_READY_START_Pos |
-                         1 << RADIO_SHORTS_END_DISABLE_Pos;
-    NRF_RADIO->TASKS_TXEN = 1;
+    /* NRF_RADIO->SHORTS |= 1 << RADIO_SHORTS_READY_START_Pos | */
+                         /* 1 << RADIO_SHORTS_END_DISABLE_Pos; */
+    NRF_RADIO->SHORTS = 0;
+
+    int a = NRF_RADIO->STATE;
+
+    disable_radio();
+
+    NRF_RADIO->EVENTS_READY = 0;
+    NRF_RADIO->TASKS_TXEN   = 1;
+
+    while (NRF_RADIO->EVENTS_READY == 0) { }
+
+    NRF_RADIO->EVENTS_END = 0;
+    NRF_RADIO->TASKS_START = 1;
+
+    while (NRF_RADIO->EVENTS_END == 0) { }
+
+    NRF_RADIO->TASKS_DISABLE = 1;
 }
 
 

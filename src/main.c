@@ -239,7 +239,7 @@ void request_transmission() {
         , MAYFLY_CALL_ID_0 // user
         , TICKER_ID_TRANSMISSION // ticker id
         , ticker_ticks_now_get() // anchor point
-        , TICKER_US_TO_TICKS(TRANSMIT_TRY_INTERVAL_US) // first interval
+        , TICKER_US_TO_TICKS(250000) // first interval (TODO as a test: half of normal interval
         , TICKER_US_TO_TICKS(TRANSMIT_TRY_INTERVAL_US) // periodic interval
         , TICKER_REMAINDER(TRANSMIT_TRY_INTERVAL_US) // remainder
         , 0 // lazy
@@ -284,8 +284,8 @@ void init_ppi() {
     const uint32_t PPI_CH1 = 11;
     const uint32_t PPI_CH2 = 12;
     gpiote_out_init(GPIO_CH0, 10, GPIOTE_CONFIG_POLARITY_Toggle, GPIOTE_CONFIG_OUTINIT_Low); // ready
-    gpiote_out_init(GPIO_CH1, 11, GPIOTE_CONFIG_POLARITY_Toggle, GPIOTE_CONFIG_OUTINIT_Low); // devmatch
-    gpiote_out_init(GPIO_CH2, 12, GPIOTE_CONFIG_POLARITY_Toggle, GPIOTE_CONFIG_OUTINIT_Low); // disable
+    gpiote_out_init(GPIO_CH1, 11, GPIOTE_CONFIG_POLARITY_Toggle, GPIOTE_CONFIG_OUTINIT_Low); // address
+    gpiote_out_init(GPIO_CH2, 12, GPIOTE_CONFIG_POLARITY_Toggle, GPIOTE_CONFIG_OUTINIT_Low); // end
 
     NRF_PPI->CH[PPI_CH0].EEP = (uint32_t) &(NRF_RADIO->EVENTS_READY);
     NRF_PPI->CH[PPI_CH0].TEP = (uint32_t) &(NRF_GPIOTE->TASKS_OUT[GPIO_CH0]);
