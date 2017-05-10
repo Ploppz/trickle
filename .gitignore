@@ -1,5 +1,5 @@
 *.emSession
 Output
 tags
-types_c.taghl
+*.taghl
 *.jlink

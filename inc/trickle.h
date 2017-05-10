@@ -17,7 +17,7 @@ typedef struct {
 
 
 void
-pdu_handle(trickle_t *trickle, uint8_t *packet_pointer);
+pdu_handle(trickle_t *trickle, uint8_t *packet_ptr, uint8_t packet_len);
 
 
 uint8_t

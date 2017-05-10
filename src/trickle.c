@@ -4,8 +4,14 @@
 #define min(a,b) ((a) < (b) ? (a) : (b))
 
 void
-pdu_handle(trickle_t *trickle, uint8_t *packet_ptr) {
+pdu_handle(trickle_t *trickle, uint8_t *packet_ptr, uint8_t packet_len) {
+    if (packet_len < get_packet_len(trickle)) {
+        return;
+    }
+
     trickle_pdu_t *pdu = (trickle_pdu_t*) packet_ptr;
+
+    int a = pdu->protocol_ID;
     
     if (pdu->protocol_ID != PROTOCOL_ID) {
         return;
@@ -15,8 +21,6 @@ pdu_handle(trickle_t *trickle, uint8_t *packet_ptr) {
         return;
     }
     
-    // TODO cmp instance id
-
     if (pdu->version_ID < trickle->pdu.version_ID) {
         // TODO broadcast
         // TODO reset i

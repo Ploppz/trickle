@@ -184,27 +184,21 @@ int main(void)
 
 
     while (1) {
-    
-        int a = 0;
         uint16_t handle = 0;
         struct radio_pdu_node_rx *node_rx = 0;
 
         uint8_t num_complete = radio_rx_get(&node_rx, &handle);
 
         if (node_rx) {
-            node_rx->hdr.onion.next = 0;
             radio_rx_dequeue();
             // Handle PDU
-            pdu_handle(&trickle, &node_rx->pdu_data[9]);
+            pdu_handle(&trickle, &node_rx->pdu_data[9], node_rx->pdu_data[1] - 6);
 
             toggle_line(13);
             //
+            node_rx->hdr.onion.next = 0;
             radio_rx_mem_release(&node_rx);
-        } else {
-            a = 0;
         }
-        int c = 1;
-        
     }
 }
 
