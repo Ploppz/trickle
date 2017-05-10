@@ -4,33 +4,39 @@
 #define min(a,b) ((a) < (b) ? (a) : (b))
 
 void
-pdu_handle(uint8_t *packet_ptr, trickle_t *trickle){
-    uint32_t protocol_ID = *(uint32_t*) packet_ptr;
-    packet_ptr += sizeof(protocol_ID);
-
-    uint8_t  instance_ID = *packet_ptr;
-    packet_ptr += sizeof(instance_ID);
-
-    uint32_t version_ID = *(uint32_t*) packet_ptr;
-    packet_ptr += sizeof(version_ID);
-
-    uint8_t *data_ptr = packet_ptr;
+pdu_handle(trickle_t *trickle, uint8_t *packet_ptr) {
+    trickle_pdu_t *pdu = (trickle_pdu_t*) packet_ptr;
     
-    if (protocol_ID != PROTOCOL_ID)
+    if (pdu->protocol_ID != PROTOCOL_ID) {
         return;
+    }
+
+    if (pdu->instance_ID != 0) {
+        return;
+    }
     
     // TODO cmp instance id
 
-    if (version_ID < trickle->version_ID) {
+    if (pdu->version_ID < trickle->pdu.version_ID) {
         // TODO broadcast
         // TODO reset i
-    } else if (version_ID > trickle->version_ID) {
+    } else if (pdu->version_ID > trickle->pdu.version_ID) {
         // TODO update own data
         // TODO reset interval to i_min
     } else {
         trickle->c_count ++;
     }
 
+}
+
+uint8_t
+get_packet_len(trickle_t *trickle) {
+    return sizeof(trickle_pdu_t);
+}
+
+uint8_t *
+get_packet_data(trickle_t *trickle) {
+    return (uint8_t*) (&trickle->pdu);
 }
 
 
@@ -66,7 +72,7 @@ uint32_t
 trickle_init(trickle_t *trickle) {
     trickle->interval = trickle_config.interval_min;
     trickle->c_count = 0;
-    trickle->protocol_ID = 0xffeeffee;
-    trickle->instance_ID = 123;
-    trickle->version_ID = 0x33333333;
+    trickle->pdu.protocol_ID = PROTOCOL_ID;
+    trickle->pdu.instance_ID = 0;
+    trickle->pdu.version_ID = 0;
 }

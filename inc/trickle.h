@@ -2,17 +2,29 @@
 
 #define PROTOCOL_ID 0xE5EF0654
 
+typedef struct {
+    uint32_t protocol_ID;
+    uint8_t  instance_ID;
+    uint32_t version_ID;
+} trickle_pdu_t;
+
 /* Trickle instance */
 typedef struct {
     uint32_t interval; // interval in microseconds / I
     uint32_t c_count; // consistency counter / c
-    uint32_t protocol_ID;
-    uint8_t instance_ID;
-    uint32_t version_ID;
+    trickle_pdu_t pdu;
 } trickle_t;
 
+
 void
-pdu_handle(uint8_t *packet_pointer, trickle_t *trickle);
+pdu_handle(trickle_t *trickle, uint8_t *packet_pointer);
+
+
+uint8_t
+get_packet_len(trickle_t *trickle);
+
+uint8_t *
+get_packet_data(trickle_t *trickle);
 
 /* returns random number from min to max */
 uint32_t 

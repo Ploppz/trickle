@@ -67,7 +67,9 @@ trickle_config_t trickle_config = {
 trickle_t trickle;
 
 
-uint8_t adv_packet[200];
+uint8_t tx_packet[MAX_PACKET_LEN];
+int8_t dev_addr[] = {0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff};
+address_type_t addr_type = ADDR_RANDOM;
 
 // Ticker timeouts
 void op_callback1(uint32_t status, void *context);
@@ -143,12 +145,10 @@ int main(void)
 
     irq_priority_set(RADIO_IRQn, CONFIG_BLUETOOTH_CONTROLLER_WORKER_PRIO);
 
-    int8_t dev_addr[] = {0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff};
-    address_type_t addr_type = ADDR_RANDOM;
     uint8_t adv_data[] = {0x02, 0x01, 0x06, 0x0B, 0x08, 'P', 'h', 'o', 'e', 'n', 'i', 'x', ' ', 'L', 'L'};
     uint8_t scn_data[] = {0x02, 0x01, 0x06, 0x0B, 0x08, 'P', 'h', 'o', 'e', 'n', 'i', 'x', ' ', 'L', 'L'};
 
-    make_pdu_packet(PDU_TYPE_ADV_IND, adv_data, sizeof(adv_data), adv_packet, addr_type, dev_addr);
+    make_pdu_packet(PDU_TYPE_ADV_IND, adv_data, sizeof(adv_data), tx_packet, addr_type, dev_addr);
 
     ll_address_set(addr_type, dev_addr);
     ll_scan_data_set(sizeof(scn_data), scn_data);
@@ -195,7 +195,7 @@ int main(void)
             node_rx->hdr.onion.next = 0;
             radio_rx_dequeue();
             // Handle PDU
-            pdu_handle( &node_rx->pdu_data[9], &trickle);
+            pdu_handle(&trickle, &node_rx->pdu_data[9]);
 
             toggle_line(13);
             //
@@ -253,9 +253,12 @@ void request_transmission() {
 void transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context) {
 
     start_hfclk();
-    /* configure_radio(adv_packet, 37, ADV_CH37); */
+    /* configure_radio(tx_packet, 37, ADV_CH37); */
     // Transmission
-    transmit(adv_packet, ADV_CH37);
+    make_pdu_packet(PDU_TYPE_ADV_IND, get_packet_data(&trickle), get_packet_len(&trickle),
+            tx_packet, addr_type, dev_addr);
+
+    transmit(tx_packet, ADV_CH37);
     // Debugging
     toggle_line(22);
 }

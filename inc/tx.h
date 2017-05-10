@@ -3,7 +3,7 @@
 
 #include <nrf.h>
 
-#define MAX_PACKET_LEN 100
+#define MAX_PACKET_LEN 50
 
 typedef enum {
   ADDR_PUBLIC = 0,
