@@ -71,7 +71,8 @@ void make_pdu_packet(uint8_t pdu_type, uint8_t *data, uint32_t data_len, uint8_t
 }
 
 
-void transmit(uint8_t *adv_packet) {
+void transmit(uint8_t *adv_packet, uint8_t rf_channel) {
+    NRF_RADIO->FREQUENCY = freq_mhz(rf_channel) - FREQ_BASE;
     NRF_RADIO->PACKETPTR = (uint32_t) adv_packet;
     NRF_RADIO->SHORTS |= 1 << RADIO_SHORTS_READY_START_Pos |
                          1 << RADIO_SHORTS_END_DISABLE_Pos;

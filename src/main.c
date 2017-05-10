@@ -25,12 +25,12 @@
 #include "hal/debug.h"
 
 uint8_t __noinit isr_stack[512];
-uint8_t __noinit main_stack[512];
+uint8_t __noinit main_stack[1024];
 void * const isr_stack_top = isr_stack + sizeof(isr_stack);
 void * const main_stack_top = main_stack + sizeof(main_stack);
 
 #define TICKER_NODES (RADIO_TICKER_NODES+2)
-#define TICKER_USER_WORKER_OPS ( RADIO_TICKER_USER_WORKER_OPS)
+#define TICKER_USER_WORKER_OPS (RADIO_TICKER_USER_WORKER_OPS)
 #define TICKER_USER_JOB_OPS (RADIO_TICKER_USER_JOB_OPS)
 #define TICKER_USER_APP_OPS (RADIO_TICKER_USER_APP_OPS)
 #define TICKER_USER_OPS (TICKER_USER_WORKER_OPS + TICKER_USER_JOB_OPS + TICKER_USER_APP_OPS)
@@ -41,6 +41,8 @@ static uint8_t ALIGNED(4) ticker_user_ops[TICKER_USER_OPS]
                         [TICKER_USER_OP_T_SIZE];
 static uint8_t ALIGNED(4) rng[3 + 4 + 1];
 static uint8_t ALIGNED(4) radio[RADIO_MEM_MNG_SIZE];
+
+
 
 #define ADV_INTERVAL_FAST  0x0020
 #define ADV_INTERVAL_SLOW  0x0800
@@ -98,7 +100,7 @@ int main(void)
 
     trickle_init(&trickle);
 
-    /* init_ppi(); */
+    init_ppi();
 
     /* Mayfly shall be initialized before any ISR executes */
     mayfly_init();
@@ -141,22 +143,27 @@ int main(void)
 
     irq_priority_set(RADIO_IRQn, CONFIG_BLUETOOTH_CONTROLLER_WORKER_PRIO);
 
-
-    uint8_t dev_addr[] = {0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff};
+    int8_t dev_addr[] = {0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff};
     address_type_t addr_type = ADDR_RANDOM;
     uint8_t adv_data[] = {0x02, 0x01, 0x06, 0x0B, 0x08, 'P', 'h', 'o', 'e', 'n', 'i', 'x', ' ', 'L', 'L'};
+    uint8_t scn_data[] = {0x02, 0x01, 0x06, 0x0B, 0x08, 'P', 'h', 'o', 'e', 'n', 'i', 'x', ' ', 'L', 'L'};
 
     make_pdu_packet(PDU_TYPE_ADV_IND, adv_data, sizeof(adv_data), adv_packet, addr_type, dev_addr);
 
+    ll_address_set(addr_type, dev_addr);
+    ll_scan_data_set(sizeof(scn_data), scn_data);
+    ll_adv_data_set(sizeof(adv_data), adv_data);
     /* initialise adv and scan params */
     ll_adv_params_set(0x300, PDU_ADV_TYPE_ADV_IND, 0x01, 0, 0, 0x07, ADV_FILTER_POLICY);
     ll_scan_params_set(1, SCAN_INTERVAL, SCAN_WINDOW, 1, SCAN_FILTER_POLICY);
 
-    {
-        start_hfclk();
-        configure_radio(adv_packet, 37, ADV_CH37);
-    }
-    /* request_transmission(); */
+
+
+
+#if 1
+    retval = ll_scan_enable(1);
+    ASSERT(!retval);
+#endif
 
     retval = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO // instance
         , 3 // user
@@ -172,29 +179,9 @@ int main(void)
         , op_callback1 // op func
         , 0 // op context
         );
-        ASSERT(!retval);
-
-
-#if 0
-    // TODO Testing only transmission, we have to do these steps.
-    // TODO It will most likely work without these as soon as scanning is enabled?
-    // TODO The question is how well it works to set the PACKETPTR & SHORTS while also scanning.
-    {
-        // Enable HFCLK
-        NRF_CLOCK->EVENTS_HFCLKSTARTED = 0;
-        NRF_CLOCK->TASKS_HFCLKSTART = 1;
-        while (NRF_CLOCK->EVENTS_HFCLKSTARTED == 0) {}
-
-        configure_radio(adv_packet, 37, ADV_CH37);
-        transmit(adv_packet);
-    }
-#endif
-
-#if 0
-    retval = ll_scan_enable(1);
-    int o = 1;
     ASSERT(!retval);
-#endif
+
+
 
     while (1) {
     /*
@@ -270,8 +257,11 @@ void request_transmission() {
 }
 
 void transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context) {
+
+    start_hfclk();
+    /* configure_radio(adv_packet, 37, ADV_CH37); */
     // Transmission
-    transmit(adv_packet);
+    transmit(adv_packet, ADV_CH37);
     // Debugging
     toggle_line(22);
 }
