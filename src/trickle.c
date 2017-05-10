@@ -5,7 +5,7 @@
 
 void
 pdu_handle(trickle_t *trickle, uint8_t *packet_ptr, uint8_t packet_len) {
-    if (packet_len < get_packet_len(trickle)) {
+    if (packet_len < sizeof(trickle_pdu_t)) {
         return;
     }
 

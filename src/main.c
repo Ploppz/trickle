@@ -54,8 +54,8 @@ static uint8_t ALIGNED(4) radio[RADIO_MEM_MNG_SIZE];
 #define ADV_FILTER_POLICY  0x00
 #define SCAN_FILTER_POLICY 0x00
 
-#define TICKER_ID_TRICKLE (RADIO_TICKER_NODES + 1)
-#define TICKER_ID_TRANSMISSION (RADIO_TICKER_NODES + 2)
+#define TICKER_ID_TRICKLE (RADIO_TICKER_NODES)
+#define TICKER_ID_TRANSMISSION (RADIO_TICKER_NODES + 1)
 
 #define TRANSMISSION_TIME 500 // TODO more accurate - what do we need
 
@@ -124,8 +124,9 @@ int main(void)
     ticker_users[MAYFLY_CALL_ID_2][0] = 0;
     ticker_users[MAYFLY_CALL_ID_PROGRAM][0] = TICKER_USER_APP_OPS;
 
-    ticker_init(RADIO_TICKER_INSTANCE_ID_RADIO, RADIO_TICKER_NODES,
-            &ticker_nodes[0], MAYFLY_CALLER_COUNT, &ticker_users[0],
+    ticker_init(RADIO_TICKER_INSTANCE_ID_RADIO,
+            TICKER_NODES, &ticker_nodes[0],
+            MAYFLY_CALLER_COUNT, &ticker_users[0],
             RADIO_TICKER_USER_OPS, &ticker_user_ops[0]);
 
     rand_init(rng, sizeof(rng));
@@ -212,7 +213,9 @@ void op_callback1(uint32_t status, void *context) {
     toggle_line(23);
 }
 void op_callback2(uint32_t status, void *context) {
-    toggle_line(24);
+    if (status == 0) {
+        toggle_line(24);
+    }
 }
 void op_callback3(uint32_t status, void *context) {
     toggle_line(25);
@@ -229,7 +232,7 @@ void trickle_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy
 void request_transmission() {
     uint32_t retval = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO // instance
         , 0 // user
-        , 0 // ticker id
+        , 8 // ticker id (TODO)
         , ticker_ticks_now_get() // anchor point
         , 0 // first interval
         , 0 // periodic interval
@@ -247,7 +250,6 @@ void request_transmission() {
 void transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context) {
 
     start_hfclk();
-    /* configure_radio(tx_packet, 37, ADV_CH37); */
     // Transmission
     make_pdu_packet(PDU_TYPE_ADV_IND, get_packet_data(&trickle), get_packet_len(&trickle),
             tx_packet, addr_type, dev_addr);

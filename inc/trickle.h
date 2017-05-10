@@ -2,14 +2,14 @@
 
 #define PROTOCOL_ID 0xE5EF0654
 
-typedef struct {
+typedef struct __attribute__((packed)) {
     uint32_t protocol_ID;
     uint8_t  instance_ID;
     uint32_t version_ID;
 } trickle_pdu_t;
 
 /* Trickle instance */
-typedef struct {
+typedef struct __attribute__((packed)) {
     uint32_t interval; // interval in microseconds / I
     uint32_t c_count; // consistency counter / c
     trickle_pdu_t pdu;
