@@ -3,6 +3,15 @@
 
 #define min(a,b) ((a) < (b) ? (a) : (b))
 
+uint8_t 
+get_draft_update_flag(trickle_t *trickle) {
+    return trickle->draft_update_flag;
+}
+
+uint8_t
+set_draft_update_flag(trickle_t *trickle, uint8_t value) {
+    trickle->draft_update_flag = value;
+}
 
 uint32_t
 next_interval(trickle_t *trickle) {
@@ -24,6 +33,8 @@ get_next_radio_drift(trickle_t *trickle){
         trickle->t_timer = rand_num;
         return rand_num;
     }
+    if(trickle->interval == 0xFFFF){
+        }
     uint32_t rand_num = get_t_value(trickle);
     uint32_t retval = (rand_num - (2 * trickle->t_timer - trickle->interval/2));
     trickle->t_timer = rand_num;
@@ -52,4 +63,6 @@ trickle_init(trickle_t *trickle) {
     trickle->interval = trickle_config.interval_min;
     trickle->c_count = 0;
     trickle->t_timer = 0;
+    trickle->draft = 0;
+    trickle->draft_update_flag = 0;
 }

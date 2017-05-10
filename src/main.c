@@ -29,7 +29,7 @@ uint8_t __noinit main_stack[512];
 void * const isr_stack_top = isr_stack + sizeof(isr_stack);
 void * const main_stack_top = main_stack + sizeof(main_stack);
 
-static uint8_t ALIGNED(4) ticker_nodes[RADIO_TICKER_NODES][TICKER_NODE_T_SIZE];
+static uint8_t ALIGNED(4) ticker_nodes[RADIO_TICKER_NODES+5][TICKER_NODE_T_SIZE];
 static uint8_t ALIGNED(4) ticker_users[MAYFLY_CALLER_COUNT][TICKER_USER_T_SIZE];
 static uint8_t ALIGNED(4) ticker_user_ops[RADIO_TICKER_USER_OPS]
                         [TICKER_USER_OP_T_SIZE+1];
@@ -71,6 +71,43 @@ void update_has_happened(uint32_t status, void *context) {
     }
 }
 
+
+void ticker_timeout2(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy,
+            void *context)
+{
+    uint32_t retval;
+    static uint32_t tick;
+
+    (void)ticks_at_expire;
+    (void)remainder;
+    (void)lazy;
+    (void)context;
+
+    
+    if(get_draft_update_flag(&trickle)){
+    retval = ticker_update(RADIO_TICKER_INSTANCE_ID_RADIO, RADIO_TICKER_USER_ID_APP, RADIO_TICKER_ID_ADV, // instance, user, ticker_id
+            // drift plus, drift minus:
+            // Notice that the periodic interval is set to 0xFFFF
+            // 0xFFFF - (0xFFFF - interval) = interval
+            0, 200,
+            0, 0, // slot
+            0, 1, // lazy, force
+            0, 0);
+
+        set_draft_update_flag(&trickle, 0);
+    }
+       
+    switch ((++tick) & 1) {
+    case 0:
+        NRF_GPIO->OUTSET = (1 << 23);
+        break;
+    case 1:
+        NRF_GPIO->OUTCLR = (1 << 23);
+        break;
+    }
+}
+
+
 void ticker_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy,
             void *context)
 {
@@ -84,6 +121,7 @@ void ticker_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy,
 
 
     uint32_t interval = next_interval(&trickle);
+    uint32_t drift = get_next_radio_drift(&trickle);
     retval = ticker_update(0, 3, 10, // instance, user, ticker_id
             // drift plus, drift minus:
             // Notice that the periodic interval is set to 0xFFFF
@@ -93,20 +131,7 @@ void ticker_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy,
             0, 1, // lazy, force
             update_has_happened, 0);
 
-    uint32_t drift = get_next_radio_drift(&trickle);
-    retval = ticker_update(RADIO_TICKER_INSTANCE_ID_RADIO, RADIO_TICKER_USER_ID_APP, RADIO_TICKER_ID_ADV, // instance, user, ticker_id
-            // drift plus, drift minus:
-            // Notice that the periodic interval is set to 0xFFFF
-            // 0xFFFF - (0xFFFF - interval) = interval
-            10000, 0,
-            0, 0, // slot
-            0, 1, // lazy, force
-            0, 0);
-
-        
-
-
-
+    set_draft_update_flag(&trickle, 1);
     switch ((++tick) & 1) {
     case 0:
         NRF_GPIO->OUTSET = (1 << 21);
@@ -279,8 +304,8 @@ int main(void)
     DEBUG_INIT();
 
     /* Dongle RGB LED */
-    NRF_GPIO->DIRSET = (1 << 13) | (1 << 14) | (1 << 21);
-    NRF_GPIO->OUTCLR = (1 << 13) | (1 << 14) | (1 << 21);
+    NRF_GPIO->DIRSET = (1 << 13) | (1 << 14) | (1 << 21) | (1 << 22) | (1 << 23);
+    NRF_GPIO->OUTCLR = (1 << 13) | (1 << 14) | (1 << 21) | (1 << 22) | (1 << 23);
 
     NRF_GPIO->DIRSET = (1 << 15);
     NRF_GPIO->OUTSET = (1 << 15);
@@ -333,8 +358,8 @@ int main(void)
         uint8_t own_bdaddr[BDADDR_SIZE] = {0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff};
         uint8_t own_bdaddr_type = 1;
         //uint8_t adv_data[] = {1,2,3,4};
-        uint8_t adv_data[] = {0x02, 0x01, 0x06, 0x0B, 0x08, 'P', 'h', 'o', 'e', 'n', 'i', 'x', ' ', 'L', 'L'};
-        uint8_t scn_data[] = {0x02, 0x01, 0x06, 0x0B, 0x08, 'P', 'h', 'o', 'e', 'n', 'i', 'x', ' ', 'L', 'L'};
+        uint8_t adv_data[] = {0x02, 0x01, 0x06, 0x0B, 0x08, 'N', 'i', 'c', 'o', 'l', 'a', 'i', ' ', 'L', 'L'};
+        uint8_t scn_data[] = {0x02, 0x01, 0x06, 0x0B, 0x08, 'P', 'h', 'o', 'e', 'n', 'i', 'x', ' ', 'X', 'X'};
         //uint8_t scn_data[] = {0x03, 0x02, 0x02, 0x18};
 
         ll_address_set(own_bdaddr_type, own_bdaddr);
@@ -346,7 +371,7 @@ int main(void)
 
     /* initialise adv and scan params */
     uint32_t t_timer = get_next_radio_drift(&trickle);
-    ll_adv_params_set(t_timer, PDU_ADV_TYPE_ADV_IND, 0x01, 0, 0, 0x07, ADV_FILTER_POLICY);
+    ll_adv_params_set(700, PDU_ADV_TYPE_ADV_IND, 0x01, 0, 0, 0x07, ADV_FILTER_POLICY);
     ll_scan_params_set(1, SCAN_INTERVAL, SCAN_WINDOW, 1, SCAN_FILTER_POLICY);
 
 
@@ -359,8 +384,26 @@ int main(void)
         , trickle_config.interval_min /* periodic interval */
         , TICKER_REMAINDER(0) /* remainder */
         , 0 /* lazy */
-        , 0 /* slot */
+        , 10 /* slot */
         , ticker_timeout /* timeout callback function */
+        , 0 /* context */
+        , 0 /* op func */
+        , 0 /* op context */
+        );
+        ASSERT(!retval);
+#endif
+
+#if 1
+    retval = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO /* instance */
+        , 3 /* user */
+        , 12 /* ticker id */
+        , ticker_ticks_now_get() /* anchor point */
+        , TICKER_US_TO_TICKS(10000) /* first interval */
+        , TICKER_US_TO_TICKS(10000) /* periodic interval */
+        , TICKER_REMAINDER(10000) /* remainder */
+        , 0 /* lazy */
+        , 10 /* slot */
+        , ticker_timeout2 /* timeout callback function */
         , 0 /* context */
         , 0 /* op func */
         , 0 /* op context */

@@ -5,7 +5,16 @@ typedef struct {
     uint32_t interval; // interval in microseconds / I
     uint32_t c_count; // consistency counter / c
     uint32_t t_timer; // current random time for transmit / t
+    uint32_t draft;
+    uint8_t draft_update_flag;
 } trickle_t;
+
+/* returns the value of update_draft_flag */
+uint8_t 
+get_draft_update_flag(trickle_t *trickle);
+
+uint8_t
+set_draft_update_flag(trickle_t *trickle, uint8_t value);
 
 /* returns random number from min to max */
 uint32_t 
