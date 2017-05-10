@@ -22,6 +22,7 @@ typedef enum {
 
 // (probably not needed in this project, as it's done by PhoenixLL
 void configure_radio(uint8_t* packet_ptr, uint8_t bt_channel, uint8_t rf_channel);
+void start_hfclk();
 
 void make_pdu_packet(pdu_type_t pdu_type, uint8_t *data, uint32_t data_len, uint8_t *dest,
         address_type_t address_type, uint8_t *dev_addr);

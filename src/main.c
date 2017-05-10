@@ -152,7 +152,10 @@ int main(void)
     ll_adv_params_set(0x300, PDU_ADV_TYPE_ADV_IND, 0x01, 0, 0, 0x07, ADV_FILTER_POLICY);
     ll_scan_params_set(1, SCAN_INTERVAL, SCAN_WINDOW, 1, SCAN_FILTER_POLICY);
 
-    transmit(adv_packet);
+    {
+        start_hfclk();
+        configure_radio(adv_packet, 37, ADV_CH37);
+    }
     /* request_transmission(); */
 
     retval = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO // instance

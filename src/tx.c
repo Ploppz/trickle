@@ -8,8 +8,13 @@ void set_address0(uint32_t address);
 uint32_t freq_mhz(uint8_t channel);
 void override_mode();
 
+void start_hfclk() {
+    // Enable HFCLK
+    NRF_CLOCK->EVENTS_HFCLKSTARTED = 0;
+    NRF_CLOCK->TASKS_HFCLKSTART = 1;
+    while (NRF_CLOCK->EVENTS_HFCLKSTARTED == 0) {}
+}
 void configure_radio(uint8_t* packet_ptr, uint8_t bt_channel, uint8_t rf_channel) {
-  
   NRF_RADIO->PCNF0 = (6 << RADIO_PCNF0_LFLEN_Pos) | 
                      (1 << RADIO_PCNF0_S0LEN_Pos) |
                      (2 << RADIO_PCNF0_S1LEN_Pos);
