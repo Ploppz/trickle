@@ -55,11 +55,11 @@ static uint8_t ALIGNED(4) radio[RADIO_MEM_MNG_SIZE];
 #define TICKER_ID_TRICKLE (RADIO_TICKER_NODES + 1)
 #define TICKER_ID_TRANSMISSION (RADIO_TICKER_NODES + 2)
 
-#define TRANSMISSION_TIME TICKER_US_TO_TICKS(500) // TODO more accurate - what do we need
+#define TRANSMISSION_TIME 500 // TODO more accurate - what do we need
 
 trickle_config_t trickle_config = {
     .interval_min = 0xFF,
-    .interval_max = 0xFFFF,
+    .interval_max = 0xFFF,
     .c_constant = 2
 };
 trickle_t trickle;
@@ -257,7 +257,7 @@ void request_transmission() {
         , 0 // periodic interval
         , 0 // remainder
         , 0 // lazy
-        , TRANSMISSION_TIME // slot
+        , TICKER_US_TO_TICKS(TRANSMISSION_TIME) // slot
         , transmit_timeout // timeout callback function
         , 0 // context
         , op_callback2 // op func
