@@ -68,7 +68,9 @@ trickle_t trickle;
 uint8_t adv_packet[200];
 
 // Ticker timeouts
-void update_has_happened(uint32_t status, void *context);
+void op_callback1(uint32_t status, void *context);
+void op_callback2(uint32_t status, void *context);
+void op_callback3(uint32_t status, void *context);
 void trickle_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context);
 void transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context);
 
@@ -94,7 +96,9 @@ int main(void)
     NRF_GPIO->OUTSET = (1 << 15);
 
 
-    init_ppi();
+    trickle_init(&trickle);
+
+    /* init_ppi(); */
 
     /* Mayfly shall be initialized before any ISR executes */
     mayfly_init();
@@ -149,7 +153,6 @@ int main(void)
     ll_scan_params_set(1, SCAN_INTERVAL, SCAN_WINDOW, 1, SCAN_FILTER_POLICY);
 
 
-    /*
     retval = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO // instance
         , 3 // user
         , TICKER_ID_TRICKLE // ticker id
@@ -161,13 +164,13 @@ int main(void)
         , 0 // slot
         , trickle_timeout // timeout callback function
         , 0 // context
-        , 0 // op func
+        , op_callback1 // op func
         , 0 // op context
         );
         ASSERT(!retval);
-        */
 
 
+#if 0
     // TODO Testing only transmission, we have to do these steps.
     // TODO It will most likely work without these as soon as scanning is enabled?
     // TODO The question is how well it works to set the PACKETPTR & SHORTS while also scanning.
@@ -180,12 +183,13 @@ int main(void)
         configure_radio(adv_packet, 37, ADV_CH37);
         transmit(adv_packet);
     }
+#endif
 
-    #if 0
+#if 0
     retval = ll_scan_enable(1);
     int o = 1;
     ASSERT(!retval);
-    #endif
+#endif
 
     while (1) {
     /*
@@ -210,31 +214,22 @@ int main(void)
 }
 
 
+
 void toggle_line(uint32_t line)
 {
     NRF_GPIO->OUT ^= 1 << line;
 }
-void update_has_happened(uint32_t status, void *context) {
-    static uint32_t tick;
-
-    switch ((++tick) & 1) {
-    case 0:
-        NRF_GPIO->OUTSET = (1 << 22);
-        break;
-    case 1:
-        NRF_GPIO->OUTCLR = (1 << 22);
-        break;
-    }
+void op_callback1(uint32_t status, void *context) {
+    toggle_line(23);
+}
+void op_callback2(uint32_t status, void *context) {
+    toggle_line(24);
+}
+void op_callback3(uint32_t status, void *context) {
+    toggle_line(25);
 }
 
 void trickle_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context) {
-    static uint32_t tick;
-
-    (void)ticks_at_expire;
-    (void)remainder;
-    (void)lazy;
-    (void)context;
-
 
     uint32_t interval = next_interval(&trickle);
     ticker_update(0, 3, TICKER_ID_TRICKLE, // instance, user, ticker_id
@@ -244,16 +239,9 @@ void trickle_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy
             0, 0xFFFF - interval,
             0, 0, // slot
             0, 1, // lazy, force
-            update_has_happened, 0);
+            op_callback3, 0);
 
-    switch ((++tick) & 1) {
-    case 0:
-        NRF_GPIO->OUTSET = (1 << 21);
-        break;
-    case 1:
-        NRF_GPIO->OUTCLR = (1 << 21);
-        break;
-    }
+    toggle_line(21);
 
     request_transmission();
 }
@@ -270,7 +258,7 @@ void request_transmission() {
         , TRANSMISSION_TIME // slot
         , transmit_timeout // timeout callback function
         , 0 // context
-        , 0 // op func
+        , op_callback2 // op func
         , 0 // op context
         );
     ASSERT(retval == 2);
@@ -280,16 +268,7 @@ void transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t laz
     // Transmission
     transmit(adv_packet);
     // Debugging
-    static uint32_t tick;
-    int a = 0;
-    switch ((++tick) & 1) {
-    case 0:
-        NRF_GPIO->OUTSET = (1 << 23);
-        break;
-    case 1:
-        NRF_GPIO->OUTCLR = (1 << 23);
-        break;
-    }
+    toggle_line(22);
 }
 
 
