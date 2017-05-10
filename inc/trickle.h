@@ -1,6 +1,6 @@
 #include <stdint.h>
 
-#define PROTOCOL_ID 0xE5EF0654
+#define PROTOCOL_ID 0x10203040
 
 typedef struct __attribute__((packed)) {
     uint32_t protocol_ID;

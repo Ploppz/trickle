@@ -57,7 +57,8 @@ static uint8_t ALIGNED(4) radio[RADIO_MEM_MNG_SIZE];
 #define TICKER_ID_TRICKLE (RADIO_TICKER_NODES)
 #define TICKER_ID_TRANSMISSION (RADIO_TICKER_NODES + 1)
 
-#define TRANSMISSION_TIME 500 // TODO more accurate - what do we need
+#define TRANSMISSION_TIME_US 500 // approximated time it takes to transmit
+#define TRANSMIT_TRY_INTERVAL_US 10000 // interval between each time we try to get a spot for transmission
 
 trickle_config_t trickle_config = {
     .interval_min = 0xFF,
@@ -149,7 +150,7 @@ int main(void)
     uint8_t adv_data[] = {0x02, 0x01, 0x06, 0x0B, 0x08, 'P', 'h', 'o', 'e', 'n', 'i', 'x', ' ', 'L', 'L'};
     uint8_t scn_data[] = {0x02, 0x01, 0x06, 0x0B, 0x08, 'P', 'h', 'o', 'e', 'n', 'i', 'x', ' ', 'L', 'L'};
 
-    make_pdu_packet(PDU_TYPE_ADV_IND, adv_data, sizeof(adv_data), tx_packet, addr_type, dev_addr);
+    /* make_pdu_packet(PDU_TYPE_ADV_IND, adv_data, sizeof(adv_data), tx_packet, addr_type, dev_addr); */
 
     ll_address_set(addr_type, dev_addr);
     ll_scan_data_set(sizeof(scn_data), scn_data);
@@ -213,10 +214,11 @@ void op_callback1(uint32_t status, void *context) {
     toggle_line(23);
 }
 void op_callback2(uint32_t status, void *context) {
-    if (status == 0) {
+    if (status == TICKER_STATUS_SUCCESS) {
         toggle_line(24);
     }
 }
+
 void op_callback3(uint32_t status, void *context) {
     toggle_line(25);
 }
@@ -230,21 +232,23 @@ void trickle_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy
 }
 
 void request_transmission() {
+    // Stop an eventual previous timer (TODO not sure if this will work)
+    ticker_stop(RADIO_TICKER_INSTANCE_ID_RADIO, 0, TICKER_ID_TRANSMISSION, 0, 0);
+
     uint32_t retval = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO // instance
-        , 0 // user
-        , 8 // ticker id (TODO)
+        , MAYFLY_CALL_ID_0 // user
+        , TICKER_ID_TRANSMISSION // ticker id
         , ticker_ticks_now_get() // anchor point
-        , 0 // first interval
-        , 0 // periodic interval
-        , 0 // remainder
+        , TICKER_US_TO_TICKS(TRANSMIT_TRY_INTERVAL_US) // first interval
+        , TICKER_US_TO_TICKS(TRANSMIT_TRY_INTERVAL_US) // periodic interval
+        , TICKER_REMAINDER(TRANSMIT_TRY_INTERVAL_US) // remainder
         , 0 // lazy
-        , TICKER_US_TO_TICKS(TRANSMISSION_TIME) // slot
+        , TICKER_US_TO_TICKS(TRANSMISSION_TIME_US) // slot
         , transmit_timeout // timeout callback function
         , 0 // context
         , op_callback2 // op func
         , 0 // op context
         );
-    int a = 0;
 }
 
 void transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context) {
@@ -254,9 +258,13 @@ void transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t laz
     make_pdu_packet(PDU_TYPE_ADV_IND, get_packet_data(&trickle), get_packet_len(&trickle),
             tx_packet, addr_type, dev_addr);
 
+    configure_radio(tx_packet, 37, ADV_CH37);
     transmit(tx_packet, ADV_CH37);
     // Debugging
     toggle_line(22);
+
+    // The timer has done its job...
+    ticker_stop(RADIO_TICKER_INSTANCE_ID_RADIO, MAYFLY_CALL_ID_1, TICKER_ID_TRANSMISSION, 0, 0);
 }
 
 
