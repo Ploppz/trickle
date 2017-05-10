@@ -26,7 +26,7 @@ void start_hfclk();
 
 void make_pdu_packet(pdu_type_t pdu_type, uint8_t *data, uint32_t data_len, uint8_t *dest,
         address_type_t address_type, uint8_t *dev_addr);
-void transmit(uint8_t *adv_packet);
+void transmit(uint8_t *adv_packet, uint8_t rf_channel);
 
 
 uint32_t low_mask(uint8_t n);
