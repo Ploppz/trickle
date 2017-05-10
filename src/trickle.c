@@ -4,12 +4,33 @@
 #define min(a,b) ((a) < (b) ? (a) : (b))
 
 void
-pdu_handle(uint8_t *packet_pointer, trickle_t *trickle){
-    uint32_t *protocol_ID_pointer = &trickle->protocol_ID;
-    uint8_t *instance_ID_pointer = &trickle->instance_ID;
-    uint32_t *version_ID_pointer = &trickle->version_ID;
+pdu_handle(uint8_t *packet_ptr, trickle_t *trickle){
+    uint32_t protocol_ID = *(uint32_t*) packet_ptr;
+    packet_ptr += sizeof(protocol_ID);
 
-    int a = 1;
+    uint8_t  instance_ID = *packet_ptr;
+    packet_ptr += sizeof(instance_ID);
+
+    uint32_t version_ID = *(uint32_t*) packet_ptr;
+    packet_ptr += sizeof(version_ID);
+
+    uint8_t *data_ptr = packet_ptr;
+    
+    if (protocol_ID != PROTOCOL_ID)
+        return;
+    
+    // TODO cmp instance id
+
+    if (version_ID < trickle->version_ID) {
+        // TODO broadcast
+        // TODO reset i
+    } else if (version_ID > trickle->version_ID) {
+        // TODO update own data
+        // TODO reset interval to i_min
+    } else {
+        trickle->c_count ++;
+    }
+
 }
 
 

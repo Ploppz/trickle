@@ -1,5 +1,7 @@
 #include <stdint.h>
 
+#define PROTOCOL_ID 0xE5EF0654
+
 /* Trickle instance */
 typedef struct {
     uint32_t interval; // interval in microseconds / I
