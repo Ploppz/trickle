@@ -3,6 +3,15 @@
 
 #define min(a,b) ((a) < (b) ? (a) : (b))
 
+void
+pdu_handle(uint8_t *packet_pointer, trickle_t *trickle){
+    uint32_t *protocol_ID_pointer = &trickle->protocol_ID;
+    uint8_t *instance_ID_pointer = &trickle->instance_ID;
+    uint32_t *version_ID_pointer = &trickle->version_ID;
+
+    int a = 1;
+}
+
 
 uint32_t
 next_interval(trickle_t *trickle) {
@@ -36,4 +45,7 @@ uint32_t
 trickle_init(trickle_t *trickle) {
     trickle->interval = trickle_config.interval_min;
     trickle->c_count = 0;
+    trickle->protocol_ID = 0xffeeffee;
+    trickle->instance_ID = 123;
+    trickle->version_ID = 0x33333333;
 }

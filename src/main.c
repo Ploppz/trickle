@@ -155,7 +155,7 @@ int main(void)
     ll_adv_data_set(sizeof(adv_data), adv_data);
     /* initialise adv and scan params */
     ll_adv_params_set(0x300, PDU_ADV_TYPE_ADV_IND, 0x01, 0, 0, 0x07, ADV_FILTER_POLICY);
-    ll_scan_params_set(1, SCAN_INTERVAL, SCAN_WINDOW, 1, SCAN_FILTER_POLICY);
+    ll_scan_params_set(1, SCAN_INTERVAL, SCAN_WINDOW*3, 1, SCAN_FILTER_POLICY);
 
 
 
@@ -184,7 +184,7 @@ int main(void)
 
 
     while (1) {
-    /*
+    
         int a = 0;
         uint16_t handle = 0;
         struct radio_pdu_node_rx *node_rx = 0;
@@ -192,8 +192,11 @@ int main(void)
         uint8_t num_complete = radio_rx_get(&node_rx, &handle);
 
         if (node_rx) {
+            node_rx->hdr.onion.next = 0;
             radio_rx_dequeue();
             // Handle PDU
+            pdu_handle( &node_rx->pdu_data[9], &trickle);
+
             toggle_line(13);
             //
             radio_rx_mem_release(&node_rx);
@@ -201,7 +204,7 @@ int main(void)
             a = 0;
         }
         int c = 1;
-        */
+        
     }
 }
 

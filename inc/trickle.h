@@ -4,7 +4,13 @@
 typedef struct {
     uint32_t interval; // interval in microseconds / I
     uint32_t c_count; // consistency counter / c
+    uint32_t protocol_ID;
+    uint8_t instance_ID;
+    uint32_t version_ID;
 } trickle_t;
+
+void
+pdu_handle(uint8_t *packet_pointer, trickle_t *trickle);
 
 /* returns random number from min to max */
 uint32_t 
