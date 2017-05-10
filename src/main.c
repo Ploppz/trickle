@@ -208,6 +208,7 @@ int main(void)
 
 void toggle_line(uint32_t line)
 {
+    return;
     NRF_GPIO->OUT ^= 1 << line;
 }
 void op_callback1(uint32_t status, void *context) {
