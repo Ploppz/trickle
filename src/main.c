@@ -167,6 +167,7 @@ int main(void)
     ASSERT(!retval);
 #endif
 
+#if 0
     retval = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO // instance
         , 3 // user
         , TICKER_ID_TRICKLE // ticker id
@@ -182,6 +183,7 @@ int main(void)
         , 0 // op context
         );
     ASSERT(!retval);
+#endif
 
 
 
@@ -229,7 +231,7 @@ void trickle_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy
     toggle_line(21);
     // TODO: Hardfaults if updating timer, so removed it
 
-    request_transmission();
+    /* request_transmission(); */
 }
 
 void request_transmission() {

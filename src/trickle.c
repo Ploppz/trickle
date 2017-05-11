@@ -28,7 +28,24 @@ pdu_handle(trickle_t *trickle, uint8_t *packet_ptr, uint8_t packet_len) {
         // Update own data
         trickle->pdu.version_ID = pdu->version_ID;
         // FOR DEMO: Set leds:
-        NRF_GPIO->OUT = (pdu->version_ID & 0b1111) << 21;
+        NRF_GPIO->OUTSET = (0b1111 << 21);
+        switch ((pdu->version_ID) & 0x03) {
+            case 1:
+                NRF_GPIO->OUTCLR = (1 << 21);
+                break;
+
+            case 2:
+                NRF_GPIO->OUTCLR = (1 << 22);
+                break;
+
+            case 3:
+                NRF_GPIO->OUTCLR = (1 << 23);
+                break;
+
+            case 0:
+                NRF_GPIO->OUTCLR = (1 << 24);
+                break;
+        }
         // TODO reset interval to i_min
     } else {
         trickle->c_count ++;
