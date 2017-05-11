@@ -46,8 +46,8 @@ static uint8_t ALIGNED(4) radio[RADIO_MEM_MNG_SIZE];
 
 #define ADV_INTERVAL_FAST  0x0020
 #define ADV_INTERVAL_SLOW  0x0800
-#define SCAN_INTERVAL      0x0100
-#define SCAN_WINDOW        0x0050
+#define SCAN_INTERVAL      0x0050
+#define SCAN_WINDOW        0x0001
 #define CONN_INTERVAL      0x0028
 #define CONN_LATENCY       0x0005
 #define CONN_TIMEOUT       0x0064
@@ -95,7 +95,7 @@ int main(void)
 
     /* Dongle RGB LED */
     NRF_GPIO->DIRSET = (1 << 21) | (1 << 22) | (1 << 23) | (1 << 24);
-    NRF_GPIO->OUTCLR = (1 << 21) | (1 << 22) | (1 << 23) | (1 << 24);
+    NRF_GPIO->OUTSET = (0b1111 << 21);
 
     NRF_GPIO->DIRSET = (1 << 15);
     NRF_GPIO->OUTSET = (1 << 15);
@@ -288,7 +288,7 @@ void init_ppi() {
     const uint32_t PPI_CH2 = 12;
     gpiote_out_init(GPIO_CH0, 10, GPIOTE_CONFIG_POLARITY_Toggle, GPIOTE_CONFIG_OUTINIT_Low); // ready
     gpiote_out_init(GPIO_CH1, 11, GPIOTE_CONFIG_POLARITY_Toggle, GPIOTE_CONFIG_OUTINIT_Low); // address
-    gpiote_out_init(GPIO_CH2, 12, GPIOTE_CONFIG_POLARITY_Toggle, GPIOTE_CONFIG_OUTINIT_Low); // end
+    gpiote_out_init(GPIO_CH2, 12, GPIOTE_CONFIG_POLARITY_Toggle, GPIOTE_CONFIG_OUTINIT_Low); // disabled
 
     NRF_PPI->CH[PPI_CH0].EEP = (uint32_t) &(NRF_RADIO->EVENTS_READY);
     NRF_PPI->CH[PPI_CH0].TEP = (uint32_t) &(NRF_GPIOTE->TASKS_OUT[GPIO_CH0]);
@@ -296,7 +296,7 @@ void init_ppi() {
     NRF_PPI->CH[PPI_CH1].EEP = (uint32_t) &(NRF_RADIO->EVENTS_ADDRESS);
     NRF_PPI->CH[PPI_CH1].TEP = (uint32_t) &(NRF_GPIOTE->TASKS_OUT[GPIO_CH1]);
 
-    NRF_PPI->CH[PPI_CH2].EEP = (uint32_t) &(NRF_RADIO->EVENTS_END);
+    NRF_PPI->CH[PPI_CH2].EEP = (uint32_t) &(NRF_RADIO->EVENTS_DISABLED);
     NRF_PPI->CH[PPI_CH2].TEP = (uint32_t) &(NRF_GPIOTE->TASKS_OUT[GPIO_CH2]);
 
     NRF_PPI->CHENSET = (1 << PPI_CH0) | (1 << PPI_CH1) | (1 << PPI_CH2);
