@@ -61,8 +61,8 @@ static uint8_t ALIGNED(4) radio[RADIO_MEM_MNG_SIZE];
 #define TRANSMIT_TRY_INTERVAL_US 10000 // interval between each time we try to get a spot for transmission
 
 trickle_config_t trickle_config = {
-    .interval_min = 0xFF,
-    .interval_max = 0xFFFF,
+    .interval_min = 1000,
+    .interval_max = 1000000,
     .c_constant = 2
 };
 trickle_t trickle;
@@ -172,8 +172,8 @@ int main(void)
         , TICKER_ID_TRICKLE // ticker id
         , ticker_ticks_now_get() // anchor point
         , TICKER_US_TO_TICKS(trickle.interval) // first interval
-        , 0xFFFF // periodic interval
-        , TICKER_REMAINDER(0) // remainder
+        , TICKER_US_TO_TICKS(trickle_config.interval_min) // periodic interval
+        , TICKER_REMAINDER(trickle_config.interval_min) // remainder
         , 0 // lazy
         , 0 // slot
         , trickle_timeout // timeout callback function
@@ -226,12 +226,10 @@ void op_callback3(uint32_t status, void *context) {
 void trickle_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context) {
 
     toggle_line(21);
+    // Set the next interval
     uint32_t interval = next_interval(&trickle);
     ticker_update(RADIO_TICKER_INSTANCE_ID_RADIO, 3, TICKER_ID_TRICKLE, // instance, user, ticker_id
-            // drift plus, drift minus:
-            // Notice that the periodic interval is set to 0xFFFF
-            // 0xFFFF - (0xFFFF - interval) = interval
-            0, 0xFFFF - interval,
+            TICKER_US_TO_TICKS(interval - trickle_config.interval_min), 0,
             0, 0, // slot
             0, 1, // lazy, force
             op_callback3, 0);
