@@ -43,34 +43,18 @@ static uint8_t ALIGNED(4) rng[3 + 4 + 1];
 static uint8_t ALIGNED(4) radio[RADIO_MEM_MNG_SIZE];
 
 
-
-#define ADV_INTERVAL_FAST  0x0020
-#define ADV_INTERVAL_SLOW  0x0800
+// TODO make all these configurable
+int8_t dev_addr[] = {0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff};
+address_type_t addr_type = ADDR_RANDOM;
 #define SCAN_INTERVAL      0x0100
 #define SCAN_WINDOW        0x0050
-#define CONN_INTERVAL      0x0028
-#define CONN_LATENCY       0x0005
-#define CONN_TIMEOUT       0x0064
-#define ADV_FILTER_POLICY  0x00
-#define SCAN_FILTER_POLICY 0x00
+#define SCAN_FILTER_POLICY 0
+
 
 #define TICKER_ID_TRICKLE (RADIO_TICKER_NODES)
 #define TICKER_ID_TRANSMISSION (RADIO_TICKER_NODES + 1)
 
-#define TRANSMISSION_TIME_US 500 // approximated time it takes to transmit
-#define TRANSMIT_TRY_INTERVAL_US 10000 // interval between each time we try to get a spot for transmission
 
-trickle_config_t trickle_config = {
-    .interval_min = 1000,
-    .interval_max = 1000000,
-    .c_constant = 2
-};
-trickle_t trickle;
-
-
-uint8_t tx_packet[MAX_PACKET_LEN];
-int8_t dev_addr[] = {0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff};
-address_type_t addr_type = ADDR_RANDOM;
 
 // Ticker timeouts
 void op_callback1(uint32_t status, void *context);
@@ -100,14 +84,8 @@ int main(void)
     NRF_GPIO->DIRSET = (1 << 15);
     NRF_GPIO->OUTSET = (1 << 15);
 
-
-    trickle_init(&trickle);
-
     init_ppi();
-
-    /* Mayfly shall be initialized before any ISR executes */
     mayfly_init();
-
 
     clock_k32src_start(1);
     irq_priority_set(POWER_CLOCK_IRQn, 0xFF);
@@ -143,65 +121,23 @@ int main(void)
                 RADIO_LL_LENGTH_OCTETS_RX_MAX,
                 RADIO_PACKET_TX_DATA_SIZE,
                 &radio[0], sizeof(radio));
-    ASSERT(retval == 0);
+    ASSERT(!retval);
 
     irq_priority_set(RADIO_IRQn, CONFIG_BLUETOOTH_CONTROLLER_WORKER_PRIO);
 
-    uint8_t adv_data[] = {0x02, 0x01, 0x06, 0x0B, 0x08, 'P', 'h', 'o', 'e', 'n', 'i', 'x', ' ', 'L', 'L'};
+
+    trickle_init(TICKER_ID_TRICKLE, 1000, 1000000, 2);
+
+    // Start scanning
+    // (TODO investigate which of these lines are necessary)
     uint8_t scn_data[] = {0x02, 0x01, 0x06, 0x0B, 0x08, 'P', 'h', 'o', 'e', 'n', 'i', 'x', ' ', 'L', 'L'};
-
-    /* make_pdu_packet(PDU_TYPE_ADV_IND, adv_data, sizeof(adv_data), tx_packet, addr_type, dev_addr); */
-
     ll_address_set(addr_type, dev_addr);
     ll_scan_data_set(sizeof(scn_data), scn_data);
-    ll_adv_data_set(sizeof(adv_data), adv_data);
-    /* initialise adv and scan params */
-    ll_adv_params_set(0x300, PDU_ADV_TYPE_ADV_IND, 0x01, 0, 0, 0x07, ADV_FILTER_POLICY);
-    ll_scan_params_set(1, SCAN_INTERVAL, SCAN_WINDOW*3, 1, SCAN_FILTER_POLICY);
-
-
-
-
-#if 1
+    ll_scan_params_set(1, SCAN_INTERVAL, SCAN_WINDOW, addr_type, SCAN_FILTER_POLICY);
     retval = ll_scan_enable(1);
     ASSERT(!retval);
-#endif
 
-    retval = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO // instance
-        , 3 // user
-        , TICKER_ID_TRICKLE // ticker id
-        , ticker_ticks_now_get() // anchor point
-        , TICKER_US_TO_TICKS(trickle.interval) // first interval
-        , TICKER_US_TO_TICKS(trickle_config.interval_min) // periodic interval
-        , TICKER_REMAINDER(trickle_config.interval_min) // remainder
-        , 0 // lazy
-        , 0 // slot
-        , trickle_timeout // timeout callback function
-        , 0 // context
-        , op_callback1 // op func
-        , 0 // op context
-        );
-    ASSERT(!retval);
-
-
-
-    while (1) {
-        uint16_t handle = 0;
-        struct radio_pdu_node_rx *node_rx = 0;
-
-        uint8_t num_complete = radio_rx_get(&node_rx, &handle);
-
-        if (node_rx) {
-            radio_rx_dequeue();
-            // Handle PDU
-            pdu_handle(&trickle, &node_rx->pdu_data[9], node_rx->pdu_data[1] - 6);
-
-            toggle_line(13);
-            //
-            node_rx->hdr.onion.next = 0;
-            radio_rx_mem_release(&node_rx);
-        }
-    }
+    while (1) { }
 }
 
 
@@ -210,69 +146,6 @@ void toggle_line(uint32_t line)
 {
     NRF_GPIO->OUT ^= 1 << line;
 }
-void op_callback1(uint32_t status, void *context) {
-    toggle_line(23);
-}
-void op_callback2(uint32_t status, void *context) {
-    if (status == TICKER_STATUS_SUCCESS) {
-        toggle_line(24);
-    }
-}
-
-void op_callback3(uint32_t status, void *context) {
-    toggle_line(25);
-}
-
-void trickle_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context) {
-
-    toggle_line(21);
-    // Set the next interval
-    uint32_t interval = next_interval(&trickle);
-    ticker_update(RADIO_TICKER_INSTANCE_ID_RADIO, 3, TICKER_ID_TRICKLE, // instance, user, ticker_id
-            TICKER_US_TO_TICKS(interval - trickle_config.interval_min), 0,
-            0, 0, // slot
-            0, 1, // lazy, force
-            op_callback3, 0);
-
-    /* request_transmission(); */
-}
-
-void request_transmission() {
-    // Stop an eventual previous timer (TODO not sure if this will work)
-    ticker_stop(RADIO_TICKER_INSTANCE_ID_RADIO, 0, TICKER_ID_TRANSMISSION, 0, 0);
-
-    uint32_t retval = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO // instance
-        , MAYFLY_CALL_ID_0 // user
-        , TICKER_ID_TRANSMISSION // ticker id
-        , ticker_ticks_now_get() // anchor point
-        , TICKER_US_TO_TICKS(100000) // first interval (TODO as a test: half of normal interval
-        , TICKER_US_TO_TICKS(TRANSMIT_TRY_INTERVAL_US) // periodic interval
-        , TICKER_REMAINDER(TRANSMIT_TRY_INTERVAL_US) // remainder
-        , 0 // lazy
-        , TICKER_US_TO_TICKS(TRANSMISSION_TIME_US) // slot
-        , transmit_timeout // timeout callback function
-        , 0 // context
-        , op_callback2 // op func
-        , 0 // op context
-        );
-}
-
-void transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context) {
-    start_hfclk();
-    // Transmission
-    make_pdu_packet(PDU_TYPE_ADV_IND, get_packet_data(&trickle), get_packet_len(&trickle),
-            tx_packet, addr_type, dev_addr);
-
-    configure_radio(tx_packet, 37, ADV_CH37);
-    transmit(tx_packet, ADV_CH37);
-    // Debugging
-    toggle_line(22);
-
-    // The timer has done its job...
-    ticker_stop(RADIO_TICKER_INSTANCE_ID_RADIO, MAYFLY_CALL_ID_1, TICKER_ID_TRANSMISSION, 0, 0);
-}
-
-
 
 void gpiote_out_init(uint32_t index, uint32_t pin, uint32_t polarity, uint32_t init_val) {
     NRF_GPIOTE->CONFIG[index] |= ((GPIOTE_CONFIG_MODE_Task << GPIOTE_CONFIG_MODE_Pos) & GPIOTE_CONFIG_MODE_Msk) |
@@ -417,9 +290,4 @@ void mayfly_pend(uint8_t caller_id, uint8_t callee_id)
 void radio_active_callback(uint8_t active)
 {
     (void)active;
-}
-
-void radio_event_callback(void)
-{
-        toggle_line(14);
 }
