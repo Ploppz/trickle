@@ -22,7 +22,7 @@ pdu_handle(trickle_t *trickle, uint8_t *packet_ptr, uint8_t packet_len) {
     }
     
     if (pdu->version_ID < trickle->pdu.version_ID) {
-        // Broadcast own data
+        // TODO broadcast own data
         // TODO reset i
     } else if (pdu->version_ID > trickle->pdu.version_ID) {
         // Update own data

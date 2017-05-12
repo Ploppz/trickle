@@ -62,7 +62,7 @@ static uint8_t ALIGNED(4) radio[RADIO_MEM_MNG_SIZE];
 
 trickle_config_t trickle_config = {
     .interval_min = 0xFF,
-    .interval_max = 0xFFF,
+    .interval_max = 0xFFFF,
     .c_constant = 2
 };
 trickle_t trickle;
@@ -172,8 +172,8 @@ int main(void)
         , TICKER_ID_TRICKLE // ticker id
         , ticker_ticks_now_get() // anchor point
         , TICKER_US_TO_TICKS(trickle.interval) // first interval
-        , TICKER_US_TO_TICKS(500000) // periodic interval
-        , TICKER_REMAINDER(500000) // remainder
+        , 0xFFFF // periodic interval
+        , TICKER_REMAINDER(0) // remainder
         , 0 // lazy
         , 0 // slot
         , trickle_timeout // timeout callback function
@@ -226,9 +226,17 @@ void op_callback3(uint32_t status, void *context) {
 void trickle_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context) {
 
     toggle_line(21);
-    // TODO: Hardfaults if updating timer, so removed it
+    uint32_t interval = next_interval(&trickle);
+    ticker_update(RADIO_TICKER_INSTANCE_ID_RADIO, 3, TICKER_ID_TRICKLE, // instance, user, ticker_id
+            // drift plus, drift minus:
+            // Notice that the periodic interval is set to 0xFFFF
+            // 0xFFFF - (0xFFFF - interval) = interval
+            0, 0xFFFF - interval,
+            0, 0, // slot
+            0, 1, // lazy, force
+            op_callback3, 0);
 
-    request_transmission();
+    /* request_transmission(); */
 }
 
 void request_transmission() {
@@ -239,7 +247,7 @@ void request_transmission() {
         , MAYFLY_CALL_ID_0 // user
         , TICKER_ID_TRANSMISSION // ticker id
         , ticker_ticks_now_get() // anchor point
-        , TICKER_US_TO_TICKS(250000) // first interval (TODO as a test: half of normal interval
+        , TICKER_US_TO_TICKS(100000) // first interval (TODO as a test: half of normal interval
         , TICKER_US_TO_TICKS(TRANSMIT_TRY_INTERVAL_US) // periodic interval
         , TICKER_REMAINDER(TRANSMIT_TRY_INTERVAL_US) // remainder
         , 0 // lazy
@@ -252,7 +260,6 @@ void request_transmission() {
 }
 
 void transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context) {
-
     start_hfclk();
     // Transmission
     make_pdu_packet(PDU_TYPE_ADV_IND, get_packet_data(&trickle), get_packet_len(&trickle),
