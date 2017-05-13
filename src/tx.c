@@ -56,7 +56,8 @@ void configure_radio(uint8_t* packet_ptr, uint8_t bt_channel, uint8_t rf_channel
 
 #define ADVA_SIZE 6 // number of uint8_ts of advertising address
 
-void make_pdu_packet(uint8_t pdu_type, uint8_t *data, uint32_t data_len, uint8_t *dest, address_type_t address_type, uint8_t *dev_addr) {
+void
+write_pdu_header(uint8_t pdu_type, uint32_t data_len, address_type_t address_type, uint8_t *dev_addr, uint8_t *dest) {
     dest[0] = (address_type << 6) | (pdu_type & low_mask(4));
     dest[1] = ADVA_SIZE + data_len;
     dest[2] = 0; // S1 is represented by one uint8_t but is not transmitted
@@ -65,9 +66,6 @@ void make_pdu_packet(uint8_t pdu_type, uint8_t *data, uint32_t data_len, uint8_t
     for (int i = 0; i < ADVA_SIZE; i ++) {
         dest[i + 3] = dev_addr[i];
     }
-
-    // Data
-    memcpy(dest + 3 + ADVA_SIZE, data, data_len);
 }
 
 void disable_radio() {

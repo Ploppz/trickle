@@ -8,8 +8,14 @@
 struct trickle_t;
 
 // Initialize module
-uint32_t
+struct trickle_t *
 trickle_init(uint32_t first_ticker_id, uint32_t interval_min_ms, uint32_t interval_max_ms, uint32_t c_constant);
+
+void
+set_data(uint32_t trickle_id, uint8_t *data);
+
+void
+pdu_handle(uint8_t *packet_ptr, uint8_t packet_len);
 
 // Ends the current interval, returns the time at which the next interval should end.
 void

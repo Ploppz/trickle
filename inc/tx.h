@@ -18,12 +18,15 @@ typedef enum {
 #define ADV_CH38 12
 #define ADV_CH39 39
 
+// The length before payload
+#define PDU_HDR_LEN 9
+
 // (probably not needed in this project, as it's done by PhoenixLL
 void configure_radio(uint8_t* packet_ptr, uint8_t bt_channel, uint8_t rf_channel);
 void start_hfclk();
 
-void make_pdu_packet(pdu_type_t pdu_type, uint8_t *data, uint32_t data_len, uint8_t *dest,
-        address_type_t address_type, uint8_t *dev_addr);
+void
+write_pdu_header(uint8_t pdu_type, uint32_t data_len, address_type_t address_type, uint8_t *dev_addr, uint8_t *dest);
 void transmit(uint8_t *adv_packet, uint8_t rf_channel);
 
 

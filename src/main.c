@@ -43,11 +43,10 @@ static uint8_t ALIGNED(4) rng[3 + 4 + 1];
 static uint8_t ALIGNED(4) radio[RADIO_MEM_MNG_SIZE];
 
 
-// TODO make all these configurable
 int8_t dev_addr[] = {0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff};
 address_type_t addr_type = ADDR_RANDOM;
-#define SCAN_INTERVAL      0x0100
-#define SCAN_WINDOW        0x0050
+#define SCAN_INTERVAL      0x0100 // 160 ms
+#define SCAN_WINDOW        0x0050 // 50 ms
 #define SCAN_FILTER_POLICY 0
 
 
@@ -133,6 +132,7 @@ int main(void)
     uint8_t scn_data[] = {0x02, 0x01, 0x06, 0x0B, 0x08, 'P', 'h', 'o', 'e', 'n', 'i', 'x', ' ', 'L', 'L'};
     ll_address_set(addr_type, dev_addr);
     ll_scan_data_set(sizeof(scn_data), scn_data);
+    // TODO passive (0)
     ll_scan_params_set(1, SCAN_INTERVAL, SCAN_WINDOW, addr_type, SCAN_FILTER_POLICY);
     retval = ll_scan_enable(1);
     ASSERT(!retval);
@@ -140,10 +140,34 @@ int main(void)
     // TODO: if we put this line before scanning init, the app won't run in normal mode, only debug.
     trickle_init(TICKER_ID_TRICKLE, 1, 1000, 2);
 
+    uint8_t data[50] = {3, 1, 2, 3};
+    set_data(0, data);
+
     while (1) { }
 }
 
 
+// Will be called when a packet has been received
+void radio_event_callback(void)
+{
+    uint16_t handle = 0;
+    struct radio_pdu_node_rx *node_rx = 0;
+
+    toggle_line(14);
+
+    uint8_t num_complete = radio_rx_get(&node_rx, &handle);
+
+    if (node_rx) {
+        radio_rx_dequeue();
+        // Handle PDU
+        pdu_handle(&node_rx->pdu_data[9], node_rx->pdu_data[1] - 6);
+
+        toggle_line(13);
+        //
+        node_rx->hdr.onion.next = 0;
+        radio_rx_mem_release(&node_rx);
+    }
+}
 
 void toggle_line(uint32_t line)
 {

@@ -1,4 +1,6 @@
 #include "nrf.h"
+
+#include <string.h>
 // Trickle
 #include "trickle.h"
 #include "tx.h"
@@ -34,7 +36,7 @@ struct trickle_t {
     uint32_t interval; // current interval in microseconds / I
     uint32_t c_count; // consistency counter / c
     trickle_pdu_t pdu;
-
+    uint8_t *data;
     // (ticker_id) is used for the main periodic timer, and (ticker_id+1) is used
     //   for the transmission timer
     uint32_t ticker_id;
@@ -56,6 +58,7 @@ typedef struct {
 static uint8_t trickle_initialized = 0;
 static trickle_config_t trickle_config;
 static trickle_t instances[N_TRICKLE_INSTANCES];
+
 uint8_t tx_packet[MAX_PACKET_LEN];
 
 void
@@ -75,11 +78,12 @@ toggle_line(uint32_t line);
 // Public interface //
 //////////////////////
 
+
 /*
  * Allocates N_TRICKLE_INSTANCES trickle instances, using ticker id `first_ticker_id` and up.
  * Trickle will use two ticker ids for each instance.
  */
-uint32_t
+trickle_t *
 trickle_init(uint32_t first_ticker_id, uint32_t interval_min_ms, uint32_t interval_max_ms, uint32_t c_constant) {
     uint32_t retval;
     // Initialize & configure module
@@ -100,6 +104,7 @@ trickle_init(uint32_t first_ticker_id, uint32_t interval_min_ms, uint32_t interv
                 .instance_id = i,
                 .version_id = 0,
             },
+            .data = 0,
             .ticker_id = ticker_id,
         };
 
@@ -119,6 +124,12 @@ trickle_init(uint32_t first_ticker_id, uint32_t interval_min_ms, uint32_t interv
             );
         ASSERT(!err);
     }
+}
+
+// TODO: should probably also increase version number or something?
+void
+set_data(uint32_t trickle_id, uint8_t *data) {
+    instances[trickle_id].data = data;
 }
 
 
@@ -165,16 +176,23 @@ request_transmission(trickle_t *trickle) {
         );
 }
 
+
 void
 transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context) {
     trickle_t *trickle = (trickle_t *) context;
-    /* return; // TODO */
+
+    // Make packet: pdu followed by eventual data
+    uint32_t data_len1 = sizeof(trickle_pdu_t);
+    uint32_t data_len2 = trickle->data[0];
+
+    memcpy(tx_packet + PDU_HDR_LEN, (uint8_t*)&trickle->pdu, data_len1);
+    if (trickle->data) {
+        memcpy(tx_packet + PDU_HDR_LEN + data_len1, ((uint8_t*)trickle->data) + 1, data_len2);
+    }
+    write_pdu_header(PDU_TYPE_ADV_IND, data_len1+data_len2, addr_type, dev_addr, tx_packet);
 
     // Transmission
     start_hfclk();
-    make_pdu_packet(PDU_TYPE_ADV_IND, get_packet_data(trickle), get_packet_len(trickle),
-            tx_packet, addr_type, dev_addr);
-
     configure_radio(tx_packet, 37, ADV_CH37);
     transmit(tx_packet, ADV_CH37);
     // Debugging
@@ -221,16 +239,6 @@ pdu_handle(uint8_t *packet_ptr, uint8_t packet_len) {
 
 }
 
-uint8_t
-get_packet_len(trickle_t *trickle) {
-    return sizeof(trickle_pdu_t);
-}
-
-uint8_t *
-get_packet_data(trickle_t *trickle) {
-    return (uint8_t*) (&trickle->pdu);
-}
-
 
 void
 trickle_next_interval(trickle_t *trickle) {
@@ -261,27 +269,6 @@ rand(int min, int max){
 
 
 
-// Will be called when a packet has been received
-void radio_event_callback(void)
-{
-    uint16_t handle = 0;
-    struct radio_pdu_node_rx *node_rx = 0;
-
-    toggle_line(14);
-
-    uint8_t num_complete = radio_rx_get(&node_rx, &handle);
-
-    if (node_rx) {
-        radio_rx_dequeue();
-        // Handle PDU
-        pdu_handle(&node_rx->pdu_data[9], node_rx->pdu_data[1] - 6);
-
-        toggle_line(13);
-        //
-        node_rx->hdr.onion.next = 0;
-        radio_rx_mem_release(&node_rx);
-    }
-}
 
 
 void toggle_line(uint32_t line)
