@@ -163,12 +163,12 @@ request_transmission(trickle_t *trickle) {
             , MAYFLY_CALL_ID_0 // user
             , trickle->ticker_id + 1 // id
             , 0, 0); // operation fp & context
-
+    uint32_t random_transmit_time = rand_range(trickle->interval/2, trickle->interval - TRANSMISSION_TIME_US);
     uint32_t retval = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO // instance
         , MAYFLY_CALL_ID_0 // user
         , trickle->ticker_id + 1 // ticker id
         , ticker_ticks_now_get() // anchor point
-        , TICKER_US_TO_TICKS(100000) // first interval (TODO: the random interval)
+        , TICKER_US_TO_TICKS(random_transmit_time) // first interval (TODO: the random interval)
         , TICKER_US_TO_TICKS(TRANSMIT_TRY_INTERVAL_US) // periodic interval
         , TICKER_REMAINDER(TRANSMIT_TRY_INTERVAL_US) // remainder
         , 0 // lazy

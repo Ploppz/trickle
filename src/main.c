@@ -127,13 +127,7 @@ int main(void)
 
     irq_priority_set(RADIO_IRQn, CONFIG_BLUETOOTH_CONTROLLER_WORKER_PRIO);
 
-    {
-        while (1) {
-            for (int i = 0; i < 1000; i ++) { }
-            uint32_t r = rand_range(0, 1000);
-            uint32_t a = r;
-        }
-    }
+
 
     // Start scanning
     // (TODO investigate which of these lines are necessary)
