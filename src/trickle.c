@@ -10,6 +10,7 @@
 #include "ctrl.h"
 #include "ll.h"
 #include "debug.h"
+#include "rand.h"
 
 #define min(a,b) ((a) < (b) ? (a) : (b))
 
@@ -69,6 +70,8 @@ void
 transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context);
 void
 toggle_line(uint32_t line);
+uint32_t
+rand_range(uint32_t min, uint32_t max);
 
 #define TRANSMISSION_TIME_US 500 // approximated time it takes to transmit
 #define TRANSMIT_TRY_INTERVAL_US 10000 // interval between each time we try to get a spot for transmission
@@ -126,6 +129,7 @@ trickle_init(uint32_t first_ticker_id, uint32_t interval_min_ms, uint32_t interv
     }
 }
 
+// First byte of the data is the leength of the rest of the data
 // TODO: should probably also increase version number or something?
 void
 set_data(uint32_t trickle_id, uint8_t *data) {
@@ -250,25 +254,14 @@ get_t_value(trickle_t *trickle){
     return rand(trickle->interval/2, trickle->interval-1);
 }
 
-uint32_t 
-rand(int min, int max){
-    NRF_RNG->EVENTS_VALRDY = 0;
-    NRF_RNG->TASKS_START = 1;
-    while(NRF_RNG->EVENTS_VALRDY == 0){
-      // Wait for value to be ready
-    }
-    uint32_t random_number = NRF_RNG->VALUE;
-    NRF_RNG->TASKS_STOP = 1;
-    while(NRF_RNG->TASKS_START == 1){
-      //wait for rand to stop
-    }
+uint32_t
+rand_range(uint32_t min, uint32_t max) {
+    uint32_t random_number = 0;
+    rand_get(1, (uint8_t*)&random_number);
     random_number *= max - min;
     random_number /= 0xFF;
     return min + random_number;
 }
-
-
-
 
 
 void toggle_line(uint32_t line)

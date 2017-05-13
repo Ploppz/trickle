@@ -68,6 +68,7 @@ void toggle_line(uint32_t line);
 void gpiote_out_init(uint32_t index, uint32_t pin, uint32_t polarity, uint32_t init_val);
 void init_ppi();
 uint32_t low_mask(uint8_t n);
+uint32_t rand_range(uint32_t min, uint32_t max);
 
 
 int main(void)
@@ -126,6 +127,13 @@ int main(void)
 
     irq_priority_set(RADIO_IRQn, CONFIG_BLUETOOTH_CONTROLLER_WORKER_PRIO);
 
+    {
+        while (1) {
+            for (int i = 0; i < 1000; i ++) { }
+            uint32_t r = rand_range(0, 1000);
+            uint32_t a = r;
+        }
+    }
 
     // Start scanning
     // (TODO investigate which of these lines are necessary)
@@ -145,6 +153,8 @@ int main(void)
 
     while (1) { }
 }
+
+
 
 
 // Will be called when a packet has been received
