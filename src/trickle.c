@@ -104,7 +104,7 @@ trickle_init(uint32_t first_ticker_id, uint32_t interval_min_ms, uint32_t interv
         };
 
         uint32_t err = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO // instance
-            , 3 // user
+            , MAYFLY_CALL_ID_PROGRAM // user
             , ticker_id // ticker id
             , ticker_ticks_now_get() // anchor point
             , TICKER_US_TO_TICKS(trickle_config.interval_min) // first interval
@@ -131,20 +131,23 @@ trickle_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, voi
     // Set the next interval
     trickle_next_interval(trickle);
     ticker_update(RADIO_TICKER_INSTANCE_ID_RADIO, // instance
-            3, // user
+            MAYFLY_CALL_ID_0, // user
             trickle->ticker_id, // ticker_id
             TICKER_US_TO_TICKS(trickle->interval - trickle_config.interval_min), 0,
             0, 0, // slot
             0, 1, // lazy, force
             0, 0);
 
-    /* request_transmission(trickle); */
+    request_transmission(trickle);
 }
 
 void
 request_transmission(trickle_t *trickle) {
     // Stop an eventual previous timer (TODO not sure if this will work)
-    ticker_stop(RADIO_TICKER_INSTANCE_ID_RADIO, 0, trickle->ticker_id + 1, 0, 0);
+    ticker_stop(RADIO_TICKER_INSTANCE_ID_RADIO // instance
+            , MAYFLY_CALL_ID_0 // user
+            , trickle->ticker_id + 1 // id
+            , 0, 0); // operation fp & context
 
     uint32_t retval = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO // instance
         , MAYFLY_CALL_ID_0 // user
@@ -156,7 +159,7 @@ request_transmission(trickle_t *trickle) {
         , 0 // lazy
         , TICKER_US_TO_TICKS(TRANSMISSION_TIME_US) // slot
         , transmit_timeout // timeout callback function
-        , 0 // context
+        , trickle // context
         , 0 // op func
         , 0 // op context
         );
@@ -165,6 +168,7 @@ request_transmission(trickle_t *trickle) {
 void
 transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context) {
     trickle_t *trickle = (trickle_t *) context;
+    /* return; // TODO */
 
     // Transmission
     start_hfclk();
@@ -177,7 +181,10 @@ transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, vo
     toggle_line(22);
 
     // The timer has done its job...
-    ticker_stop(RADIO_TICKER_INSTANCE_ID_RADIO, MAYFLY_CALL_ID_1, trickle->ticker_id + 1, 0, 0);
+    ticker_stop(RADIO_TICKER_INSTANCE_ID_RADIO // instance
+            , MAYFLY_CALL_ID_0 // user
+            , trickle->ticker_id + 1 // id
+            , 0, 0); // operation fp & context
 }
 
 
