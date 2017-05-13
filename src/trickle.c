@@ -91,6 +91,7 @@ trickle_init(uint32_t first_ticker_id, uint32_t interval_min_ms, uint32_t interv
 
     // Initialize trickle instances
     for (int i = 0; i < N_TRICKLE_INSTANCES; i ++) {
+        uint32_t ticker_id = first_ticker_id + 2*i;
         instances[i] = (trickle_t) {
             .interval = trickle_config.interval_min,
             .c_count = 0,
@@ -98,12 +99,13 @@ trickle_init(uint32_t first_ticker_id, uint32_t interval_min_ms, uint32_t interv
                 .protocol_id = PROTOCOL_ID,
                 .instance_id = i,
                 .version_id = 0,
-            }
+            },
+            .ticker_id = ticker_id,
         };
 
         uint32_t err = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO // instance
             , 3 // user
-            , first_ticker_id + 2*i // ticker id
+            , ticker_id // ticker id
             , ticker_ticks_now_get() // anchor point
             , TICKER_US_TO_TICKS(trickle_config.interval_min) // first interval
             , TICKER_US_TO_TICKS(trickle_config.interval_min) // periodic interval
@@ -164,8 +166,8 @@ void
 transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context) {
     trickle_t *trickle = (trickle_t *) context;
 
-    start_hfclk();
     // Transmission
+    start_hfclk();
     make_pdu_packet(PDU_TYPE_ADV_IND, get_packet_data(trickle), get_packet_len(trickle),
             tx_packet, addr_type, dev_addr);
 

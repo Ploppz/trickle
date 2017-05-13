@@ -78,14 +78,16 @@ int main(void)
     DEBUG_INIT();
 
     /* Dongle RGB LED */
-    NRF_GPIO->DIRSET = (1 << 21) | (1 << 22) | (1 << 23) | (1 << 24);
-    NRF_GPIO->OUTCLR = (1 << 21) | (1 << 22) | (1 << 23) | (1 << 24);
+    NRF_GPIO->DIRSET = (0b1111 << 21) | (1 << 14);
+    NRF_GPIO->OUTSET = (0b1111 << 21);
+    NRF_GPIO->OUTCLR =  (1 << 14);
 
     NRF_GPIO->DIRSET = (1 << 15);
     NRF_GPIO->OUTSET = (1 << 15);
 
-    init_ppi();
+    /* Mayfly shall be initialized before any ISR executes */
     mayfly_init();
+    init_ppi();
 
     clock_k32src_start(1);
     irq_priority_set(POWER_CLOCK_IRQn, 0xFF);
@@ -126,8 +128,6 @@ int main(void)
     irq_priority_set(RADIO_IRQn, CONFIG_BLUETOOTH_CONTROLLER_WORKER_PRIO);
 
 
-    trickle_init(TICKER_ID_TRICKLE, 1000, 1000000, 2);
-
     // Start scanning
     // (TODO investigate which of these lines are necessary)
     uint8_t scn_data[] = {0x02, 0x01, 0x06, 0x0B, 0x08, 'P', 'h', 'o', 'e', 'n', 'i', 'x', ' ', 'L', 'L'};
@@ -136,6 +136,9 @@ int main(void)
     ll_scan_params_set(1, SCAN_INTERVAL, SCAN_WINDOW, addr_type, SCAN_FILTER_POLICY);
     retval = ll_scan_enable(1);
     ASSERT(!retval);
+
+    // TODO: if we put this line before scanning init, the app won't run in normal mode, only debug.
+    trickle_init(TICKER_ID_TRICKLE, 1, 1000, 2);
 
     while (1) { }
 }
