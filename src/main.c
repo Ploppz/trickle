@@ -140,11 +140,13 @@ int main(void)
     ASSERT(!retval);
 
     // TODO: if we put this line before scanning init, the app won't run in normal mode, only debug.
-    trickle_init(TICKER_ID_TRICKLE, 1, 1000, 2);
+    trickle_init(TICKER_ID_TRICKLE, 100, 200000, 2);
 
     uint8_t data[50] = {3, 1, 2, 3};
     set_data(0, data);
 
+
+    
     while (1) { }
 }
 

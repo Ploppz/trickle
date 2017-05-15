@@ -12,6 +12,8 @@
 #include "debug.h"
 #include "rand.h"
 
+#include "hal/radio.h"
+
 #define min(a,b) ((a) < (b) ? (a) : (b))
 
 #define N_TRICKLE_INSTANCES 1
@@ -154,6 +156,8 @@ trickle_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, voi
             0, 0);
 
     request_transmission(trickle);
+
+    radio_disable();
 }
 
 void
@@ -182,7 +186,38 @@ request_transmission(trickle_t *trickle) {
 
 
 void
+reset_timers(trickle_t *trickle) {
+
+    // Stop periodic timer
+    ticker_stop(RADIO_TICKER_INSTANCE_ID_RADIO // instance
+            , MAYFLY_CALL_ID_0 // user
+            , trickle->ticker_id // id
+            , 0, 0); // operation fp & context
+
+    // Start periodic timer
+    uint32_t retval = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO // instance
+        , MAYFLY_CALL_ID_0 // user
+        , trickle->ticker_id // ticker id
+        , ticker_ticks_now_get() // anchor point
+        , TICKER_US_TO_TICKS(trickle_config.interval_min) // first interval
+        , TICKER_US_TO_TICKS(trickle_config.interval_min) // periodic interval
+        , TICKER_REMAINDER(trickle_config.interval_min) // remainder
+        , 0 // lazy
+        , 0 // slot
+        , trickle_timeout // timeout callback function
+        , trickle // context
+        , 0 // op func
+        , 0 // op context
+        );
+    
+    request_transmission(trickle);
+}
+
+
+void
 transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context) {
+    radio_reset();
+    
     trickle_t *trickle = (trickle_t *) context;
 
     // Make packet: pdu followed by eventual data
@@ -231,12 +266,12 @@ pdu_handle(uint8_t *packet_ptr, uint8_t packet_len) {
     trickle_t *trickle = instances + pdu->instance_id;
     
     if (pdu->version_id < trickle->pdu.version_id) {
-        // TODO broadcast own data
-        // TODO reset i
+        trickle->interval = trickle_config.interval_min;
+        reset_timers(trickle);
     } else if (pdu->version_id > trickle->pdu.version_id) {
-        // Update own data
         trickle->pdu.version_id = pdu->version_id;
-        // TODO reset interval to i_min
+        trickle->interval = trickle_config.interval_min;
+        reset_timers(trickle);
     } else {
         trickle->c_count ++;
     }
