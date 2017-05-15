@@ -40,26 +40,6 @@ static uint8_t trickle_initialized = 0;
 static trickle_t instances[N_TRICKLE_INSTANCES];
 uint8_t tx_packet[MAX_PACKET_LEN];
 
-
-///////////
-// Index //
-///////////
-
-/* Structures */
-// Each key starts at MAX_KEY_SIZE * N, but has variable size.
-static uint8_t key_heap[MAX_KEY_SIZE * N_TRICKLE_INSTANCES];
-static uint8_t *key_heap_top = 0;
-static uint8_t value_heap[MAX_VAL_SIZE * N_TRICKLE_INSTANCES];
-static uint8_t *val_heap_top = 0;
-
-// For each instance, a pointer to this instance's key and value, if defined.
-typedef struct {
-    uint8_t key_len;
-    uint8_t val_len;
-} key_val_info_t;
-static key_val_info_t *index[N_TRICKLE_INSTANCES];
-
-
 /////////////
 // Trickle //
 /////////////
@@ -83,7 +63,7 @@ void
 trickle_init(struct trickle_t *instances, trickle_id_t n) {
     for (int i = 0; i < n; i ++) {
         instances[i] = (trickle_t) {
-            .interval = trickle_config.min_interval_us,
+            .interval = trickle_config.interval_max_us,
             .c_count = trickle_config.c_threshold, // because at the very start, 
             .version = 0,
 
@@ -140,15 +120,30 @@ void
 transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context) {
     trickle_t *trickle = (trickle_t *) context;
 
-    // Make packet: pdu followed by eventual data
-    uint32_t data_len1 = sizeof(trickle_pdu_t);
-    uint32_t data_len2 = trickle->data[0];
+    // Packet structure ... name (bytes)
+    // - version (4)
+    // - key_len (1)
+    // - key bytes (key_len)
+    // - val_len (1)
+    // - val bytes (val_len)
 
-    memcpy(tx_packet + PDU_HDR_LEN, (uint8_t*)&trickle->pdu, data_len1);
-    if (trickle->data) {
-        memcpy(tx_packet + PDU_HDR_LEN + data_len1, ((uint8_t*)trickle->data) + 1, data_len2);
-    }
-    write_pdu_header(PDU_TYPE_ADV_IND, data_len1+data_len2, addr_type, dev_addr, tx_packet);
+    uint8_t *packet_ptr = tx_packet;
+    packet_ptr += PDU_HDR_LEN;
+
+    // Version
+    ((uint32_t*)packet_ptr)[0] = trickle->version;
+
+    // Key
+    uint8_t key_len = trickle_config.get_key_fp((uint8_t*)trickle, &packet_ptr[1]);
+    packet_ptr[0] =  key_len;
+    packet_ptr += 1 + key_len;
+
+    // Value
+    uint8_t val_len = trickle_config.get_data_fp((uint8_t*)trickle, &packet_ptr[1]);
+    packet_ptr[0] =    val_len;
+    packet_ptr += 1 + val_len;
+    
+    write_pdu_header(PDU_TYPE_ADV_IND, packet_ptr - tx_packet, addr_type, dev_addr, tx_packet);
 
     // Transmission
     start_hfclk();
@@ -167,23 +162,31 @@ transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, vo
 
 void
 pdu_handle(uint8_t *packet_ptr, uint8_t packet_len) {
+    uint32_t version = ((uint32_t*)packet_ptr)[0];
+    packet_ptr += sizeof(version);
 
-    // TODO Lookup instance
-    if (pdu->instance_id != 0) {
-        return;
-    }
+    uint8_t key_len = packet_ptr[0];
+    packet_ptr += sizeof(key_len);
+    slice_t key = new_slice(packet_ptr, key_len);
+    packet_ptr += key_len;
 
-    trickle_t *trickle = instances + pdu->instance_id;
+
+    uint8_t val_len = packet_ptr[0];
+    packet_ptr += sizeof(val_len);
+    slice_t val = new_slice(packet_ptr, val_len);
+    packet_ptr += val_len;
+
+    trickle_t *instance = trickle_config.get_instance_fp(key);
     
-    if (pdu->version_id < trickle->pdu.version_id) {
+    if (version < instance->version) {
         // TODO broadcast own data
         // TODO reset i
-    } else if (pdu->version_id > trickle->pdu.version_id) {
+    } else if (version > instance->version) {
         // Update own data
-        trickle->pdu.version_id = pdu->version_id;
+        instance->version = version;
         // TODO reset interval to i_min
     } else {
-        trickle->c_count ++;
+        instance->c_count ++;
     }
 
 }

@@ -1,5 +1,6 @@
 #include "trickle.h"
 #include "tx.h"
+#include "positioning.h"
 
 #include "soc.h"
 #include "cpu.h"
@@ -31,7 +32,7 @@ uint8_t __noinit main_stack[2048];
 void * const isr_stack_top = isr_stack + sizeof(isr_stack);
 void * const main_stack_top = main_stack + sizeof(main_stack);
 
-#define TICKER_NODES (RADIO_TICKER_NODES + 2 * N_TICKER_INSTANCES)
+#define TICKER_NODES (RADIO_TICKER_NODES + 2 * N_TRICKLE_INSTANCES)
 #define TICKER_USER_WORKER_OPS (RADIO_TICKER_USER_WORKER_OPS)
 #define TICKER_USER_JOB_OPS (RADIO_TICKER_USER_JOB_OPS)
 #define TICKER_USER_APP_OPS (RADIO_TICKER_USER_APP_OPS)
@@ -54,67 +55,20 @@ address_type_t addr_type = ADDR_RANDOM;
 #define TICKER_ID_TRICKLE (RADIO_TICKER_NODES)
 
 
-/////////////////
-// For Trickle //
-/////////////////
-
-// Global database
-static uint8_t data[N_TRICKLE_NODES][N_TRICKLE_NODES];
-// Memory for trickle instances
-static uint8_t instances[N_TRICKLE_NODES][N_TRICKLE_NODES][TRICKLE_T_SIZE];
-
-// Access structure to map (address <-> index)
-typedef struct {
-    uint8_t present;
-    uint8_t address[6];
-} address_index_t;
-
-static address_index_t addresses[N_TRICKLE_NODES];
-static uint16_t addresses_top = 0;
-
-/* Translation from address to index. If address isn't yet indexed, give it an index.
-   Note: In this application, a key consists of two 6-byte addresses.
-*/
-uint32_t
-get_index(slice_t address) {
-    for (int i = 0; i < N_TRICKLE_NODES; i ++) {
-        if (addresses[i].present) {
-            if (memcmp(addresses[i].address, address.data, 6) == 0) {
-                return i;
-            }
-        } else {
-            break;
-        }
-    }
-
-    // The address is not found. Give it an index.
-    uint32_t new_index = addresses_top++;
-    memcpy(addresses[new_index].address, address.data, 6);
-    return new_index;
-}
-
-
-// TODO they do the same work..
-slice_t
-get_data     (slice_t key) {
-    uint32_t i = get_index(key);
-    return new_slice(&data[i][j], 1);
-}
-struct trickle_t*
-get_instance (slice_t key) {
-    uint32_t i = get_index(key);
-    return (trickle_t *) instances;
-}
+/////////////
+// Trickle //
+/////////////
 
 trickle_config_t trickle_config = {
     .interval_min_us = 1000,
     .interval_max_us = 1000000,
     .c_threshold = 2,
     
-    .first_ticker_id =  TRICKLE_ID_TICKER,
+    .first_ticker_id =  TICKER_ID_TRICKLE,
 
-    .get_data_fp = get_data,
-    .get_instance_fp = get_instance,
+    .get_key_fp = &get_key,
+    .get_data_fp = &get_data,
+    .get_instance_fp = &get_instance,
 };
 
 //////////////////
@@ -211,7 +165,7 @@ int main(void)
     retval = ll_scan_enable(1);
     ASSERT(!retval);
 
-    trickle_init(instances, N_TRICKLE_NODES * N_TRICKLE_NODES);
+    positioning_init();
 
     uint8_t data[50] = {3, 1, 2, 3};
     set_data(0, data);

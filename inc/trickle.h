@@ -15,9 +15,11 @@ struct trickle_t;
 typedef uint16_t trickle_id_t;
 
 
-// If data is not present, register it...
-typedef slice_t            (*trickle_get_data_fp_t)     (slice_t key);
-// If key is not found, this function should initialize a trickle struct
+// get_key:
+typedef uint8_t            (*trickle_get_key_fp_t)     (uint8_t *instance, uint8_t *dest);
+// get_data: If data is not present, register it...
+typedef uint8_t            (*trickle_get_data_fp_t)    (uint8_t *instance, uint8_t *dest);
+// get_instance: If key is not found, this function should initialize a trickle struct
 typedef struct trickle_t*  (*trickle_get_instance_fp_t) (slice_t key);
 
 typedef struct {
@@ -30,8 +32,9 @@ typedef struct {
     uint32_t first_ticker_id;
 
     // Functionality provided by the application
-    trickle_get_data_fp_t get_data_fp;
-    trickle_get_instance_fp_t get_instance_fp;
+    trickle_get_key_fp_t        get_key_fp;
+    trickle_get_data_fp_t       get_data_fp;
+    trickle_get_instance_fp_t   get_instance_fp;
 } trickle_config_t;
 
 extern trickle_config_t trickle_config;
