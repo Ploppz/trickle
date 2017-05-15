@@ -12,32 +12,23 @@
 #include "debug.h"
 #include "rand.h"
 
+
+// Limitation: key and value passed with a particular instance_id must always have the same width.
+
 #define min(a,b) ((a) < (b) ? (a) : (b))
 
-#define N_TRICKLE_INSTANCES 1
 
-
-// TODO .. dupliate from main.c
+// TODO .. this is duplicate from main.c
 int8_t dev_addr[] = {0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff};
 address_type_t addr_type = ADDR_RANDOM;
-
-/////////////
-// Structs //
-/////////////
-
-typedef struct __attribute__((packed)) {
-    uint32_t protocol_id;
-    uint8_t  instance_id;
-    uint32_t version_id;
-} trickle_pdu_t;
 
 
 /* Trickle instance */
 struct trickle_t {
     uint32_t interval; // current interval in microseconds / I
     uint32_t c_count; // consistency counter / c
-    trickle_pdu_t pdu;
-    uint8_t *data;
+    uint32_t version;
+
     // (ticker_id) is used for the main periodic timer, and (ticker_id+1) is used
     //   for the transmission timer
     uint32_t ticker_id;
@@ -45,22 +36,33 @@ struct trickle_t {
 
 typedef struct trickle_t trickle_t;
 
-
-typedef struct {
-    uint32_t interval_min; // in microseconds
-    uint32_t interval_max; // in microseconds
-    uint32_t c_constant; // consistency constant / k
-
-    uint32_t scan_interval;
-    uint32_t scan_window;
-} trickle_config_t;
-
-
 static uint8_t trickle_initialized = 0;
-static trickle_config_t trickle_config;
 static trickle_t instances[N_TRICKLE_INSTANCES];
-
 uint8_t tx_packet[MAX_PACKET_LEN];
+
+
+///////////
+// Index //
+///////////
+
+/* Structures */
+// Each key starts at MAX_KEY_SIZE * N, but has variable size.
+static uint8_t key_heap[MAX_KEY_SIZE * N_TRICKLE_INSTANCES];
+static uint8_t *key_heap_top = 0;
+static uint8_t value_heap[MAX_VAL_SIZE * N_TRICKLE_INSTANCES];
+static uint8_t *val_heap_top = 0;
+
+// For each instance, a pointer to this instance's key and value, if defined.
+typedef struct {
+    uint8_t key_len;
+    uint8_t val_len;
+} key_val_info_t;
+static key_val_info_t *index[N_TRICKLE_INSTANCES];
+
+
+/////////////
+// Trickle //
+/////////////
 
 void
 trickle_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context);
@@ -77,65 +79,18 @@ rand_range(uint32_t min, uint32_t max);
 #define TRANSMIT_TRY_INTERVAL_US 10000 // interval between each time we try to get a spot for transmission
 
 
-//////////////////////
-// Public interface //
-//////////////////////
-
-
-/*
- * Allocates N_TRICKLE_INSTANCES trickle instances, using ticker id `first_ticker_id` and up.
- * Trickle will use two ticker ids for each instance.
- */
-trickle_t *
-trickle_init(uint32_t first_ticker_id, uint32_t interval_min_ms, uint32_t interval_max_ms, uint32_t c_constant) {
-    uint32_t retval;
-    // Initialize & configure module
-    ASSERT(!trickle_initialized);
-    trickle_initialized = 1;
-    trickle_config.interval_min = interval_min_ms * 1000;
-    trickle_config.interval_max = interval_max_ms * 1000;
-    trickle_config.c_constant = c_constant;
-
-    // Initialize trickle instances
-    for (int i = 0; i < N_TRICKLE_INSTANCES; i ++) {
-        uint32_t ticker_id = first_ticker_id + 2*i;
+void
+trickle_init(struct trickle_t *instances, trickle_id_t n) {
+    for (int i = 0; i < n; i ++) {
         instances[i] = (trickle_t) {
-            .interval = trickle_config.interval_min,
-            .c_count = 0,
-            .pdu = (trickle_pdu_t) {
-                .protocol_id = PROTOCOL_ID,
-                .instance_id = i,
-                .version_id = 0,
-            },
-            .data = 0,
-            .ticker_id = ticker_id,
-        };
+            .interval = trickle_config.min_interval_us,
+            .c_count = trickle_config.c_threshold, // because at the very start, 
+            .version = 0,
 
-        uint32_t err = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO // instance
-            , MAYFLY_CALL_ID_PROGRAM // user
-            , ticker_id // ticker id
-            , ticker_ticks_now_get() // anchor point
-            , TICKER_US_TO_TICKS(trickle_config.interval_min) // first interval
-            , TICKER_US_TO_TICKS(trickle_config.interval_min) // periodic interval
-            , TICKER_REMAINDER(trickle_config.interval_min) // remainder
-            , 0 // lazy
-            , 0 // slot
-            , trickle_timeout // timeout callback function
-            , instances + i // context
-            , 0 // op func
-            , 0 // op context
-            );
-        ASSERT(!err);
+            .ticker_id = trickle_config.first_ticker_id + i,
+        };
     }
 }
-
-// First byte of the data is the leength of the rest of the data
-// TODO: should probably also increase version number or something?
-void
-set_data(uint32_t trickle_id, uint8_t *data) {
-    instances[trickle_id].data = data;
-}
-
 
 void
 trickle_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context) {
@@ -148,7 +103,7 @@ trickle_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, voi
     ticker_update(RADIO_TICKER_INSTANCE_ID_RADIO, // instance
             MAYFLY_CALL_ID_0, // user
             trickle->ticker_id, // ticker_id
-            TICKER_US_TO_TICKS(trickle->interval - trickle_config.interval_min), 0,
+            TICKER_US_TO_TICKS(trickle->interval - trickle_config.interval_min_us), 0,
             0, 0, // slot
             0, 1, // lazy, force
             0, 0);
@@ -212,18 +167,8 @@ transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, vo
 
 void
 pdu_handle(uint8_t *packet_ptr, uint8_t packet_len) {
-    if (packet_len < sizeof(trickle_pdu_t)) {
-        return;
-    }
 
-    trickle_pdu_t *pdu = (trickle_pdu_t*) packet_ptr;
-
-    int a = pdu->protocol_id;
-    
-    if (pdu->protocol_id != PROTOCOL_ID) {
-        return;
-    }
-
+    // TODO Lookup instance
     if (pdu->instance_id != 0) {
         return;
     }
@@ -246,7 +191,7 @@ pdu_handle(uint8_t *packet_ptr, uint8_t packet_len) {
 
 void
 trickle_next_interval(trickle_t *trickle) {
-    trickle->interval = min(trickle->interval * 2, trickle_config.interval_max);
+    trickle->interval = min(trickle->interval * 2, trickle_config.interval_max_us);
 }
 
 uint32_t
