@@ -1,6 +1,7 @@
 #include "trickle.h"
 #include "tx.h"
 #include "positioning.h"
+#include "slice.h"
 
 #include "soc.h"
 #include "cpu.h"
@@ -147,14 +148,6 @@ int main(void)
 
     irq_priority_set(RADIO_IRQn, CONFIG_BLUETOOTH_CONTROLLER_WORKER_PRIO);
 
-    {
-        while (1) {
-            for (int i = 0; i < 1000; i ++) { }
-            uint32_t r = rand_range(0, 1000);
-            uint32_t a = r;
-        }
-    }
-
     // Start scanning
     // (TODO investigate which of these lines are necessary)
     uint8_t scn_data[] = {0x02, 0x01, 0x06, 0x0B, 0x08, 'P', 'h', 'o', 'e', 'n', 'i', 'x', ' ', 'L', 'L'};
@@ -167,6 +160,14 @@ int main(void)
     ASSERT(!retval);
 
     positioning_init();
+    uint8_t key_data[12] = {0,0,0,0,0,0,  1,1,1,1,1,1};
+    slice_t key = new_slice(key_data, sizeof(key_data));
+    uint8_t val_data = 5;
+    slice_t val = new_slice(&val_data, sizeof(val_data));
+
+
+    trickle_value_write(get_instance(key), key, val);
+
 
     while (1) { }
 }

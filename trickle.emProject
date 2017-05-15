@@ -44,6 +44,7 @@
       <file file_name="src/main.c" />
       <file file_name="src/trickle.c" />
       <file file_name="src/tx.c" />
+      <file file_name="src/positioning.c" />
     </folder>
     <configuration
       Name="Debug"

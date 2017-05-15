@@ -19,7 +19,7 @@ static uint16_t addresses_top = 0;
 
 void
 positioning_init() {
-    trickle_init(instances, N_TRICKLE_NODES * N_TRICKLE_NODES);
+    trickle_init((struct trickle_t*)instances, N_TRICKLE_NODES * N_TRICKLE_NODES);
 }
 /* Translation from address to index. If address isn't yet indexed, give it an index.
    Note: In this application, a key consists of two 6-byte addresses.
@@ -45,7 +45,7 @@ get_index(slice_t address) {
 void
 get_double_index(uint8_t *instance, uint16_t *i, uint16_t *j) {
 
-    uint32_t index = (instance - instances) / TRICKLE_T_SIZE;
+    uint32_t index = (instance - (uint8_t*)instances) / TRICKLE_T_SIZE;
     // Convert from index to (i, j) index into 2D array
     *i = index / N_TRICKLE_NODES;
     *j = index % N_TRICKLE_NODES;
@@ -69,14 +69,15 @@ get_key(uint8_t *instance, uint8_t *dest) {
 
 // Write data of a trickle instance to `dest`. Returns bytes written
 uint8_t
-get_val     (uint8_t *instance, uint8_t *dest) {
+get_val(uint8_t *instance, uint8_t *dest) {
     uint16_t i, j;
     get_double_index(instance, &i, &j);
     *dest = values[i][j];
     return 1;
 }
 struct trickle_t*
-get_instance (slice_t key) {
-    uint32_t i = get_index(key);
-    return (trickle_t *) instances;
+get_instance(slice_t key) {
+    uint32_t i = get_index(new_slice(key.data,     6));
+    uint32_t j = get_index(new_slice(key.data + 6, 6));
+    return (struct trickle_t *) &instances[i][j];
 }

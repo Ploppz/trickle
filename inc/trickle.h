@@ -51,7 +51,7 @@ trickle_pdu_handle(uint8_t *packet_ptr, uint8_t packet_len);
 
 // Write new data to an instance, incrementing the version number.
 void
-trickle_write(struct trickle_t *instance, slice_t key, slice_t val);
+trickle_value_write(struct trickle_t *instance, slice_t key, slice_t val);
 
 // TODO no idea why there is not a linker error.... investigate!
 uint32_t 

@@ -4,6 +4,8 @@
 // Trickle
 #include "trickle.h"
 #include "tx.h"
+#include "slice.h"
+
 
 // PhoenixxLL
 #include "ticker.h"
@@ -54,6 +56,20 @@ void
 toggle_line(uint32_t line);
 uint32_t
 rand_range(uint32_t min, uint32_t max);
+
+// TODO .. in lack of a better more endianness-agnostic way to read/write uint32_t in byte streams
+uint32_t
+read_quad(uint8_t *bytes) {
+    return (bytes[3]<<24) | (bytes[2]<<16) | (bytes[1]<<8) | (bytes[0]);
+}
+void
+write_quad(uint8_t *dest, uint32_t quad) {
+    uint32_t low_mask = (1<<9) - 1;
+    dest[0] = (quad    ) & low_mask;
+    dest[1] = (quad>> 8) & low_mask;
+    dest[2] = (quad>>16) & low_mask;
+    dest[3] = (quad>>24) & low_mask;
+}
 
 #define TRANSMISSION_TIME_US 500 // approximated time it takes to transmit
 #define TRANSMIT_TRY_INTERVAL_US 10000 // interval between each time we try to get a spot for transmission
@@ -123,11 +139,12 @@ request_transmission(trickle_t *trickle) {
 
 void
 transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context) {
+    toggle_line(22);
     trickle_t *trickle = (trickle_t *) context;
 
     // Packet structure:
     // |----------+---------|
-    // | name     | bytes   |
+    // | field    | bytes   |
     // |----------+---------|
     // | version  | 4       |
     // | key_len  | 1       |
@@ -136,12 +153,12 @@ transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, vo
     // | val      | val_len |
     // |----------+---------|
 
-
     uint8_t *packet_ptr = tx_packet;
     packet_ptr += PDU_HDR_LEN;
 
     // Version
-    ((uint32_t*)packet_ptr)[0] = trickle->version;
+    write_quad(packet_ptr, trickle->version);
+    packet_ptr += sizeof(uint32_t);
 
     // Key
     uint8_t key_len = trickle_config.get_key_fp((uint8_t*)trickle, &packet_ptr[1]);
@@ -159,8 +176,6 @@ transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, vo
     start_hfclk();
     configure_radio(tx_packet, 37, ADV_CH37);
     transmit(tx_packet, ADV_CH37);
-    // Debugging
-    toggle_line(22);
 
     // The timer has done its job...
     ticker_stop(RADIO_TICKER_INSTANCE_ID_RADIO // instance
@@ -170,12 +185,35 @@ transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, vo
 }
 
 
-// trickle_pdu_handle handles external message
-// trickle_write handles internal message
-// both will call value_register to decide what is done with the data
+// - `trickle_pdu_handle` handles external message
+// - `trickle_write` handles internal message
+// - both will call `value_register` to decide what is done with the data
 
 void
+start_instance(trickle_t *instance) {
+    uint32_t err = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO // instance
+        , MAYFLY_CALL_ID_PROGRAM // user
+        , instance->ticker_id // ticker id
+        , ticker_ticks_now_get() // anchor point
+        , TICKER_US_TO_TICKS(trickle_config.interval_min_us) // first interval
+        , TICKER_US_TO_TICKS(trickle_config.interval_min_us) // periodic interval
+        , TICKER_REMAINDER(trickle_config.interval_min_us) // remainder
+        , 0 // lazy
+        , 0 // slot
+        , trickle_timeout // timeout callback function
+        , instance // context
+        , 0 // op func
+        , 0 // op context
+        );
+    ASSERT(!err);
+}
+void
 value_register(trickle_t *instance, slice_t key, slice_t val, trickle_version_t version) {
+    // If local version is 0, it means the instance is unused and should be initialised
+    if (instance->version == 0) {
+        start_instance(instance);
+    }
+
     if (version < instance->version) {
         // TODO broadcast own value
         // TODO reset i
@@ -187,21 +225,32 @@ value_register(trickle_t *instance, slice_t key, slice_t val, trickle_version_t 
         instance->c_count ++;
     }
 }
+
+
 void
 trickle_pdu_handle(uint8_t *packet_ptr, uint8_t packet_len) {
-    uint32_t version = ((uint32_t*)packet_ptr)[0];
+    uint8_t *packet_end_ptr = packet_ptr + packet_len; // in order to check later that the packet length is correct
+
+    uint32_t version = read_quad(packet_ptr);
     packet_ptr += sizeof(version);
 
     uint8_t key_len = packet_ptr[0];
     packet_ptr += sizeof(key_len);
+    if (key_len != 12) return; // TODO: TMP SOLUTION TO DISCRIMINATE NONTRICKLE PACKETS
     slice_t key = new_slice(packet_ptr, key_len);
     packet_ptr += key_len;
 
 
     uint8_t val_len = packet_ptr[0];
     packet_ptr += sizeof(val_len);
+    if (val_len != 1) return; // TODO: TMP SOLUTION TO DISCRIMINATE NONTRICKLE PACKETS
     slice_t val = new_slice(packet_ptr, val_len);
     packet_ptr += val_len;
+
+    // Check that we have read exactly until packet_len
+    if (packet_ptr != packet_end_ptr) {
+        return;
+    }
 
     trickle_t *instance = trickle_config.get_instance_fp(key);
 
