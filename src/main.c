@@ -67,7 +67,7 @@ trickle_config_t trickle_config = {
     .first_ticker_id =  TICKER_ID_TRICKLE,
 
     .get_key_fp = &get_key,
-    .get_data_fp = &get_data,
+    .get_val_fp = &get_val,
     .get_instance_fp = &get_instance,
 };
 
@@ -160,15 +160,13 @@ int main(void)
     uint8_t scn_data[] = {0x02, 0x01, 0x06, 0x0B, 0x08, 'P', 'h', 'o', 'e', 'n', 'i', 'x', ' ', 'L', 'L'};
     ll_address_set(addr_type, dev_addr);
     ll_scan_data_set(sizeof(scn_data), scn_data);
+
     // TODO passive (0)
     ll_scan_params_set(1, SCAN_INTERVAL, SCAN_WINDOW, addr_type, SCAN_FILTER_POLICY);
     retval = ll_scan_enable(1);
     ASSERT(!retval);
 
     positioning_init();
-
-    uint8_t data[50] = {3, 1, 2, 3};
-    set_data(0, data);
 
     while (1) { }
 }
@@ -189,7 +187,7 @@ void radio_event_callback(void)
     if (node_rx) {
         radio_rx_dequeue();
         // Handle PDU
-        pdu_handle(&node_rx->pdu_data[9], node_rx->pdu_data[1] - 6);
+        trickle_pdu_handle(&node_rx->pdu_data[9], node_rx->pdu_data[1] - 6);
 
         toggle_line(13);
         //

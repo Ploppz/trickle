@@ -3,7 +3,7 @@
 
 // Structures, helper functions and interface for trickle
 
-static uint8_t data[N_TRICKLE_NODES][N_TRICKLE_NODES];
+static uint8_t values[N_TRICKLE_NODES][N_TRICKLE_NODES];
 // Memory for trickle instances
 static uint8_t instances[N_TRICKLE_NODES][N_TRICKLE_NODES][TRICKLE_T_SIZE];
 
@@ -69,10 +69,10 @@ get_key(uint8_t *instance, uint8_t *dest) {
 
 // Write data of a trickle instance to `dest`. Returns bytes written
 uint8_t
-get_data     (uint8_t *instance, uint8_t *dest) {
+get_val     (uint8_t *instance, uint8_t *dest) {
     uint16_t i, j;
     get_double_index(instance, &i, &j);
-    *dest = data[i][j];
+    *dest = values[i][j];
     return 1;
 }
 struct trickle_t*

@@ -12,13 +12,13 @@ struct trickle_t;
 
 
 // id of a trickle instance
-typedef uint16_t trickle_id_t;
+typedef uint32_t trickle_version_t;
 
 
 // get_key:
 typedef uint8_t            (*trickle_get_key_fp_t)     (uint8_t *instance, uint8_t *dest);
 // get_data: If data is not present, register it...
-typedef uint8_t            (*trickle_get_data_fp_t)    (uint8_t *instance, uint8_t *dest);
+typedef uint8_t            (*trickle_get_val_fp_t)    (uint8_t *instance, uint8_t *dest);
 // get_instance: If key is not found, this function should initialize a trickle struct
 typedef struct trickle_t*  (*trickle_get_instance_fp_t) (slice_t key);
 
@@ -33,7 +33,7 @@ typedef struct {
 
     // Functionality provided by the application
     trickle_get_key_fp_t        get_key_fp;
-    trickle_get_data_fp_t       get_data_fp;
+    trickle_get_val_fp_t        get_val_fp;
     trickle_get_instance_fp_t   get_instance_fp;
 } trickle_config_t;
 
@@ -43,35 +43,20 @@ extern trickle_config_t trickle_config;
 
 // Initialize an array of trickle instances
 void
-trickle_init(struct trickle_t *instances, trickle_id_t n);
+trickle_init(struct trickle_t *instances, uint32_t n);
 
-
+// Handle incoming trickle packet
 void
-set_data(uint32_t trickle_id, uint8_t *data);
+trickle_pdu_handle(uint8_t *packet_ptr, uint8_t packet_len);
 
+// Write new data to an instance, incrementing the version number.
 void
-pdu_handle(uint8_t *packet_ptr, uint8_t packet_len);
+trickle_write(struct trickle_t *instance, slice_t key, slice_t val);
 
-// Get the instance id 
-uint32_t
-get_instance_id(slice_t key);
-
-// Ends the current interval, returns the time at which the next interval should end.
-void
-trickle_next_interval(struct trickle_t *trickle);
-
-uint8_t
-get_packet_len(struct trickle_t *trickle);
-
-uint8_t *
-get_packet_data(struct trickle_t *trickle);
-
-
-/* returns random number from min to max */
+// TODO no idea why there is not a linker error.... investigate!
 uint32_t 
 rand(int min, int max);
 
-/* get t value */
 uint32_t
 get_t_value(struct trickle_t *trickle);
 

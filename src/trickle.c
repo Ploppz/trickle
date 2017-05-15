@@ -60,7 +60,7 @@ rand_range(uint32_t min, uint32_t max);
 
 
 void
-trickle_init(struct trickle_t *instances, trickle_id_t n) {
+trickle_init(struct trickle_t *instances, uint32_t n) {
     for (int i = 0; i < n; i ++) {
         instances[i] = (trickle_t) {
             .interval = trickle_config.interval_max_us,
@@ -70,6 +70,11 @@ trickle_init(struct trickle_t *instances, trickle_id_t n) {
             .ticker_id = trickle_config.first_ticker_id + i,
         };
     }
+}
+
+void
+trickle_next_interval(trickle_t *trickle) {
+    trickle->interval = min(trickle->interval * 2, trickle_config.interval_max_us);
 }
 
 void
@@ -120,12 +125,17 @@ void
 transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context) {
     trickle_t *trickle = (trickle_t *) context;
 
-    // Packet structure ... name (bytes)
-    // - version (4)
-    // - key_len (1)
-    // - key bytes (key_len)
-    // - val_len (1)
-    // - val bytes (val_len)
+    // Packet structure:
+    // |----------+---------|
+    // | name     | bytes   |
+    // |----------+---------|
+    // | version  | 4       |
+    // | key_len  | 1       |
+    // | key      | key_len |
+    // | val_len  | 1       |
+    // | val      | val_len |
+    // |----------+---------|
+
 
     uint8_t *packet_ptr = tx_packet;
     packet_ptr += PDU_HDR_LEN;
@@ -139,7 +149,7 @@ transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, vo
     packet_ptr += 1 + key_len;
 
     // Value
-    uint8_t val_len = trickle_config.get_data_fp((uint8_t*)trickle, &packet_ptr[1]);
+    uint8_t val_len = trickle_config.get_val_fp((uint8_t*)trickle, &packet_ptr[1]);
     packet_ptr[0] =    val_len;
     packet_ptr += 1 + val_len;
     
@@ -160,8 +170,25 @@ transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, vo
 }
 
 
+// trickle_pdu_handle handles external message
+// trickle_write handles internal message
+// both will call value_register to decide what is done with the data
+
 void
-pdu_handle(uint8_t *packet_ptr, uint8_t packet_len) {
+value_register(trickle_t *instance, slice_t key, slice_t val, trickle_version_t version) {
+    if (version < instance->version) {
+        // TODO broadcast own value
+        // TODO reset i
+    } else if (version > instance->version) {
+        // Update own data
+        instance->version = version;
+        // TODO reset interval to i_min
+    } else {
+        instance->c_count ++;
+    }
+}
+void
+trickle_pdu_handle(uint8_t *packet_ptr, uint8_t packet_len) {
     uint32_t version = ((uint32_t*)packet_ptr)[0];
     packet_ptr += sizeof(version);
 
@@ -177,25 +204,16 @@ pdu_handle(uint8_t *packet_ptr, uint8_t packet_len) {
     packet_ptr += val_len;
 
     trickle_t *instance = trickle_config.get_instance_fp(key);
-    
-    if (version < instance->version) {
-        // TODO broadcast own data
-        // TODO reset i
-    } else if (version > instance->version) {
-        // Update own data
-        instance->version = version;
-        // TODO reset interval to i_min
-    } else {
-        instance->c_count ++;
-    }
 
+    value_register(instance, key, val, version);
 }
-
-
 void
-trickle_next_interval(trickle_t *trickle) {
-    trickle->interval = min(trickle->interval * 2, trickle_config.interval_max_us);
+trickle_value_write(trickle_t *instance, slice_t key, slice_t val) {
+
+    value_register(instance, key, val, instance->version + 1);
 }
+
+
 
 uint32_t
 get_t_value(trickle_t *trickle){
