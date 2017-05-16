@@ -154,6 +154,8 @@ transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, vo
     uint8_t *packet_ptr = tx_packet;
     packet_ptr += PDU_HDR_LEN;
 
+    uint8_t *packet_start_ptr = packet_ptr;
+
     // Version
     write_quad(packet_ptr, trickle->version);
     packet_ptr += sizeof(uint32_t);
@@ -169,7 +171,7 @@ transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, vo
     memcpy(&packet_ptr[1], val.ptr, val.len);
     packet_ptr += 1 + val.len;
     
-    write_pdu_header(PDU_TYPE_ADV_IND, packet_ptr - tx_packet, addr_type, dev_addr, tx_packet);
+    write_pdu_header(PDU_TYPE_ADV_IND, packet_ptr - packet_start_ptr, addr_type, dev_addr, tx_packet);
 
     // Transmission
     start_hfclk();
