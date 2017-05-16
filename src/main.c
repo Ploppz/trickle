@@ -78,16 +78,15 @@ int main(void)
     DEBUG_INIT();
 
     /* Dongle RGB LED */
-    NRF_GPIO->DIRSET = (0b1111 << 21) | (1 << 14);
-    NRF_GPIO->OUTSET = (0b1111 << 21);
-    NRF_GPIO->OUTCLR =  (1 << 14);
+    NRF_GPIO->DIRSET = (0b1111 << 21) | (1 << 10) | (1 << 11) | (1 << 12) | (1 << 16) | (1 << 17) | (1 << 18) | (1 << 19) | (1 << 20);
+    NRF_GPIO->OUTSET = (0b1111 << 21) | (1 << 10) | (1 << 11) | (1 << 12) | (1 << 16) | (1 << 17) | (1 << 18) | (1 << 19) | (1 << 20);
 
     NRF_GPIO->DIRSET = (1 << 15);
     NRF_GPIO->OUTSET = (1 << 15);
 
     /* Mayfly shall be initialized before any ISR executes */
     mayfly_init();
-    init_ppi();
+    //init_ppi();
 
     clock_k32src_start(1);
     irq_priority_set(POWER_CLOCK_IRQn, 0xFF);
@@ -140,7 +139,7 @@ int main(void)
     ASSERT(!retval);
 
     // TODO: if we put this line before scanning init, the app won't run in normal mode, only debug.
-    trickle_init(TICKER_ID_TRICKLE, 100, 200000, 2);
+    trickle_init(TICKER_ID_TRICKLE, 2, 2001, 2);
 
     uint8_t data[50] = {3, 1, 2, 3};
     set_data(0, data);

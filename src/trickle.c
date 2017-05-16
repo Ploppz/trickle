@@ -217,7 +217,30 @@ reset_timers(trickle_t *trickle) {
 void
 transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context) {
     radio_reset();
-    
+
+//10-11-12-16
+
+    NRF_GPIO->OUTCLR = (1 << 10) | (1 << 11) | (1 << 12);
+    if(lazy == 0){
+        
+    }else if (lazy == 1){
+        NRF_GPIO->OUTSET = (1 << 10);
+    }else if (lazy == 2){
+        NRF_GPIO->OUTSET = (1 << 11);
+    }else if (lazy == 3){
+        NRF_GPIO->OUTSET = (1 << 10) | (1 << 11);
+    }else if (lazy == 4){
+        NRF_GPIO->OUTSET = (1 << 12);
+    }else if (lazy == 5){
+        NRF_GPIO->OUTSET = (1 << 10) | (1 << 12);
+    }else if (lazy == 6){
+        NRF_GPIO->OUTSET = (1 << 11) | (1 << 12);
+    }else{
+        NRF_GPIO->OUTSET = (1 << 10) | (1 << 11) | (1 << 12);
+    }
+    NRF_GPIO->OUT ^= (1 << 16);
+
+
     trickle_t *trickle = (trickle_t *) context;
 
     // Make packet: pdu followed by eventual data
