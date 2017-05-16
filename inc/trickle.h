@@ -18,7 +18,7 @@ typedef uint32_t trickle_version_t;
 // get_key:
 typedef uint8_t            (*trickle_get_key_fp_t)     (uint8_t *instance, uint8_t *dest);
 // get_data: If data is not present, register it...
-typedef uint8_t            (*trickle_get_val_fp_t)    (uint8_t *instance, uint8_t *dest);
+typedef slice_t            (*trickle_get_val_fp_t)    (uint8_t *instance);
 // get_instance: If key is not found, this function should initialize a trickle struct
 typedef struct trickle_t*  (*trickle_get_instance_fp_t) (slice_t key);
 

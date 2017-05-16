@@ -9,12 +9,8 @@ toggle_app_init();
 uint8_t
 toggle_get_key(uint8_t *instance, uint8_t *dest);
 
-uint8_t
-toggle_get_val(uint8_t *instance, uint8_t *dest);
-/* TODO NOW.. should be:
 slice_t
 toggle_get_val(uint8_t *instance);
-*/
 
 
 struct trickle_t*

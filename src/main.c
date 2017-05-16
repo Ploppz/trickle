@@ -48,8 +48,6 @@ static uint8_t ALIGNED(4) rng[3 + 4 + 1];
 static uint8_t ALIGNED(4) radio[RADIO_MEM_MNG_SIZE];
 
 
-int8_t dev_addr[] = {0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff};
-address_type_t addr_type = ADDR_RANDOM;
 #define SCAN_INTERVAL      0x0100 // 160 ms
 #define SCAN_WINDOW        0x0050 // 50 ms
 #define SCAN_FILTER_POLICY 0
@@ -151,6 +149,9 @@ int main(void)
 
     // Start scanning
     // (TODO investigate which of these lines are necessary)
+
+    int8_t dev_addr[] = {0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff};
+    address_type_t addr_type = ADDR_RANDOM;
     uint8_t scn_data[] = {0x02, 0x01, 0x06, 0x0B, 0x08, 'P', 'h', 'o', 'e', 'n', 'i', 'x', ' ', 'L', 'L'};
     ll_address_set(addr_type, dev_addr);
     ll_scan_data_set(sizeof(scn_data), scn_data);

@@ -21,7 +21,7 @@
 
 
 // TODO .. this is duplicate from main.c
-int8_t dev_addr[] = {0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff};
+int8_t dev_addr[] = {0xff, 0xee, 0xdd, 0xdd, 0xee, 0xff};
 address_type_t addr_type = ADDR_RANDOM;
 
 
@@ -164,9 +164,10 @@ transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, vo
     packet_ptr += 1 + key_len;
 
     // Value
-    uint8_t val_len = trickle_config.get_val_fp((uint8_t*)trickle, &packet_ptr[1]);
-    packet_ptr[0] =    val_len;
-    packet_ptr += 1 + val_len;
+    slice_t val = trickle_config.get_val_fp((uint8_t*)trickle);
+    packet_ptr[0] =    val.len;
+    memcpy(&packet_ptr[1], val.ptr, val.len);
+    packet_ptr += 1 + val.len;
     
     write_pdu_header(PDU_TYPE_ADV_IND, packet_ptr - tx_packet, addr_type, dev_addr, tx_packet);
 
@@ -206,7 +207,7 @@ start_instance(trickle_t *instance) {
     ASSERT(!err);
 }
 void
-value_register(trickle_t *instance, slice_t key, slice_t val, trickle_version_t version) {
+value_register(trickle_t *instance, slice_t key, slice_t new_val, trickle_version_t version) {
     // If local version is 0, it means the instance is unused and should be initialised
     if (instance->version == 0) {
         start_instance(instance);
@@ -218,6 +219,13 @@ value_register(trickle_t *instance, slice_t key, slice_t val, trickle_version_t 
     } else if (version > instance->version) {
         // Update own data
         instance->version = version;
+        slice_t val = trickle_config.get_val_fp((uint8_t*)instance);
+
+        if (val.len != new_val.len) {
+            // Erroneous packet... abort (TODO think about this)
+            return;
+        }
+        memcpy(val.ptr, new_val.ptr, new_val.len);
         // TODO reset interval to i_min
     } else {
         instance->c_count ++;

@@ -24,7 +24,7 @@ uint32_t
 toggle_get_index(slice_t address) {
     for (int i = 0; i < N_TRICKLE_NODES; i ++) {
         if (addresses[i].present) {
-            if (memcmp(addresses[i].address, address.data, 6) == 0) {
+            if (memcmp(addresses[i].address, address.ptr, 6) == 0) {
                 return i;
             }
         } else {
@@ -34,7 +34,7 @@ toggle_get_index(slice_t address) {
 
     // The address is not found. Give it an index.
     uint32_t new_index = addresses_top++;
-    memcpy(addresses[new_index].address, address.data, 6);
+    memcpy(addresses[new_index].address, address.ptr, 6);
     return new_index;
 }
 
@@ -63,15 +63,14 @@ toggle_get_key(uint8_t *instance, uint8_t *dest) {
 }
 
 // Write data of a trickle instance to `dest`. Returns bytes written
-uint8_t
-toggle_get_val(uint8_t *instance, uint8_t *dest) {
+slice_t
+toggle_get_val(uint8_t *instance) {
     uint16_t i = get_instance_index(instance);
-    *dest = values[i];
-    return 1;
+    return new_slice(&values[i], 1);
 }
 
 struct trickle_t*
 toggle_get_instance(slice_t key) {
-    uint32_t i = toggle_get_index(new_slice(key.data, 6));
+    uint32_t i = toggle_get_index(new_slice(key.ptr, 6));
     return (struct trickle_t *) &instances[i];
 }
