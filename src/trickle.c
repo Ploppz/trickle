@@ -38,8 +38,6 @@ struct trickle_t {
 
 typedef struct trickle_t trickle_t;
 
-static uint8_t trickle_initialized = 0;
-static trickle_t instances[N_TRICKLE_INSTANCES];
 uint8_t tx_packet[MAX_PACKET_LEN];
 
 /////////////
@@ -236,14 +234,12 @@ trickle_pdu_handle(uint8_t *packet_ptr, uint8_t packet_len) {
 
     uint8_t key_len = packet_ptr[0];
     packet_ptr += sizeof(key_len);
-    if (key_len != 12) return; // TODO: TMP SOLUTION TO DISCRIMINATE NONTRICKLE PACKETS
     slice_t key = new_slice(packet_ptr, key_len);
     packet_ptr += key_len;
 
 
     uint8_t val_len = packet_ptr[0];
     packet_ptr += sizeof(val_len);
-    if (val_len != 1) return; // TODO: TMP SOLUTION TO DISCRIMINATE NONTRICKLE PACKETS
     slice_t val = new_slice(packet_ptr, val_len);
     packet_ptr += val_len;
 
@@ -258,7 +254,6 @@ trickle_pdu_handle(uint8_t *packet_ptr, uint8_t packet_len) {
 }
 void
 trickle_value_write(trickle_t *instance, slice_t key, slice_t val) {
-
     value_register(instance, key, val, instance->version + 1);
 }
 

@@ -1,7 +1,8 @@
 #include "trickle.h"
 #include "tx.h"
-#include "positioning.h"
 #include "slice.h"
+#include "toggle.h"
+#include "positioning.h"
 
 #include "soc.h"
 #include "cpu.h"
@@ -67,9 +68,9 @@ trickle_config_t trickle_config = {
     
     .first_ticker_id =  TICKER_ID_TRICKLE,
 
-    .get_key_fp = &get_key,
-    .get_val_fp = &get_val,
-    .get_instance_fp = &get_instance,
+    .get_key_fp = &toggle_get_key,
+    .get_val_fp = &toggle_get_val,
+    .get_instance_fp = &toggle_get_instance,
 };
 
 //////////////////
@@ -159,14 +160,14 @@ int main(void)
     retval = ll_scan_enable(1);
     ASSERT(!retval);
 
-    positioning_init();
-    uint8_t key_data[12] = {0,0,0,0,0,0,  1,1,1,1,1,1};
+    toggle_app_init();
+    uint8_t key_data[6] = {0xaa, 0xbb, 0xcc, 0xcc, 0xbb, 0xaa};
     slice_t key = new_slice(key_data, sizeof(key_data));
-    uint8_t val_data = 5;
+    uint8_t val_data = 0x55;
     slice_t val = new_slice(&val_data, sizeof(val_data));
 
 
-    trickle_value_write(get_instance(key), key, val);
+    trickle_value_write(toggle_get_instance(key), key, val);
 
 
     while (1) { }
