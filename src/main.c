@@ -28,8 +28,7 @@
 #include "hal/debug.h"
 
 /* Positioning application */
-
-uint8_t __noinit isr_stack[512];
+uint8_t __noinit isr_stack[2048];
 uint8_t __noinit main_stack[2048];
 void * const isr_stack_top = isr_stack + sizeof(isr_stack);
 void * const main_stack_top = main_stack + sizeof(main_stack);
@@ -98,16 +97,15 @@ int main(void)
     DEBUG_INIT();
 
     /* Dongle RGB LED */
-    NRF_GPIO->DIRSET = (0b1111 << 21) | (1 << 14);
-    NRF_GPIO->OUTSET = (0b1111 << 21);
-    NRF_GPIO->OUTCLR =  (1 << 14);
+    NRF_GPIO->DIRSET = (0b1111 << 21) | (1 << 10) | (1 << 11) | (1 << 12) | (1 << 16) | (1 << 17) | (1 << 18) | (1 << 19) | (1 << 20);
+    NRF_GPIO->OUTSET = (0b1111 << 21) | (1 << 10) | (1 << 11) | (1 << 12) | (1 << 16) | (1 << 17) | (1 << 18) | (1 << 19) | (1 << 20);
 
     NRF_GPIO->DIRSET = (1 << 15);
     NRF_GPIO->OUTSET = (1 << 15);
 
     /* Mayfly shall be initialized before any ISR executes */
     mayfly_init();
-    init_ppi();
+    //init_ppi();
 
     clock_k32src_start(1);
     irq_priority_set(POWER_CLOCK_IRQn, 0xFF);
@@ -171,6 +169,8 @@ int main(void)
     trickle_value_write(toggle_get_instance(key), key, val);
 
 
+
+    
     while (1) { }
 }
 

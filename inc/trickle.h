@@ -7,6 +7,8 @@
 #include "tx.h"
 #include "slice.h"
 
+#define PROTOCOL_ID 0x50607080
+
 struct trickle_t;
 #define TRICKLE_T_SIZE 16
 
