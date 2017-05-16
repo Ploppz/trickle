@@ -24,7 +24,7 @@
 
 #include "hal/debug.h"
 
-uint8_t __noinit isr_stack[512];
+uint8_t __noinit isr_stack[2048];
 uint8_t __noinit main_stack[2048];
 void * const isr_stack_top = isr_stack + sizeof(isr_stack);
 void * const main_stack_top = main_stack + sizeof(main_stack);
