@@ -187,7 +187,7 @@ transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, vo
 
 
 // - `trickle_pdu_handle` handles external message
-// - `trickle_write` handles internal message
+// - `trickle_value_write` handles internal message
 // - both will call `value_register` to decide what is done with the data
 
 void
