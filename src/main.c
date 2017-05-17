@@ -4,6 +4,7 @@
 #include "toggle.h"
 #include "positioning.h"
 
+
 #include "soc.h"
 #include "cpu.h"
 #include "irq.h"
@@ -33,7 +34,8 @@ uint8_t __noinit main_stack[2048];
 void * const isr_stack_top = isr_stack + sizeof(isr_stack);
 void * const main_stack_top = main_stack + sizeof(main_stack);
 
-#define TICKER_NODES (RADIO_TICKER_NODES + 2 * N_TRICKLE_INSTANCES)
+#define TICKER_NODES (RADIO_TICKER_NODES + 1 + TICKER_PER_TRICKLE * N_TRICKLE_INSTANCES)
+
 #define TICKER_USER_WORKER_OPS (RADIO_TICKER_USER_WORKER_OPS)
 #define TICKER_USER_JOB_OPS (RADIO_TICKER_USER_JOB_OPS)
 #define TICKER_USER_APP_OPS (RADIO_TICKER_USER_APP_OPS)
@@ -51,7 +53,8 @@ static uint8_t ALIGNED(4) radio[RADIO_MEM_MNG_SIZE];
 #define SCAN_WINDOW        0x0050 // 50 ms
 #define SCAN_FILTER_POLICY 0
 
-#define TICKER_ID_TRICKLE (RADIO_TICKER_NODES)
+#define TICKER_ID_APP (RADIO_TICKER_NODES)
+#define TICKER_ID_TRICKLE (RADIO_TICKER_NODES+1)
 
 
 /////////////
@@ -88,7 +91,13 @@ void gpiote_out_init(uint32_t index, uint32_t pin, uint32_t polarity, uint32_t i
 void init_ppi();
 uint32_t low_mask(uint8_t n);
 uint32_t rand_range(uint32_t min, uint32_t max);
+void app_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context);
+void read_address();
 
+static uint8_t trickle_val = 0;
+
+int8_t dev_addr[6];
+address_type_t addr_type;
 
 int main(void)
 {
@@ -102,6 +111,21 @@ int main(void)
 
     NRF_GPIO->DIRSET = (1 << 15);
     NRF_GPIO->OUTSET = (1 << 15);
+
+
+    #if UART
+    uart_init(UART, 1);
+    irq_priority_set(UART0_IRQn, 0xFF);
+    irq_enable(UART0_IRQn);
+
+    uart_tx_str("\n\n\nBLE LL.\n");
+
+    {
+        extern void assert_print(void);
+
+        assert_print();
+    }
+    #endif
 
     /* Mayfly shall be initialized before any ISR executes */
     mayfly_init();
@@ -145,33 +169,65 @@ int main(void)
 
     irq_priority_set(RADIO_IRQn, CONFIG_BLUETOOTH_CONTROLLER_WORKER_PRIO);
 
+    read_address();
     // Start scanning
     // (TODO investigate which of these lines are necessary)
 
-    int8_t dev_addr[] = {0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff};
-    address_type_t addr_type = ADDR_RANDOM;
     uint8_t scn_data[] = {0x02, 0x01, 0x06, 0x0B, 0x08, 'P', 'h', 'o', 'e', 'n', 'i', 'x', ' ', 'L', 'L'};
     ll_address_set(addr_type, dev_addr);
     ll_scan_data_set(sizeof(scn_data), scn_data);
 
     // TODO passive (0)
+#if 0
     ll_scan_params_set(1, SCAN_INTERVAL, SCAN_WINDOW, addr_type, SCAN_FILTER_POLICY);
     retval = ll_scan_enable(1);
     ASSERT(!retval);
+#endif
+
 
     toggle_app_init();
-    uint8_t key_data[6] = {0xaa, 0xbb, 0xcc, 0xcc, 0xbb, 0xaa};
-    slice_t key = new_slice(key_data, sizeof(key_data));
-    uint8_t val_data = 0x55;
-    slice_t val = new_slice(&val_data, sizeof(val_data));
 
+    slice_t key = new_slice(dev_addr, 6);
+    slice_t val = new_slice(&trickle_val, 1);
+    trickle_value_write(toggle_get_instance(key), key, val, MAYFLY_CALL_ID_0);
 
-    trickle_value_write(toggle_get_instance(key), key, val);
+#define PERIOD_MS 1000
+    uint32_t err = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO // instance
+        , MAYFLY_CALL_ID_PROGRAM // user
+        , TICKER_ID_APP // ticker id
+        , ticker_ticks_now_get() // anchor point
+        , TICKER_US_TO_TICKS(PERIOD_MS * 1000) // first interval
+        , TICKER_US_TO_TICKS(PERIOD_MS * 1000) // periodic interval
+        , TICKER_REMAINDER(PERIOD_MS * 1000) // remainder
+        , 0 // lazy
+        , 0 // slot
+        , app_timeout // timeout callback function
+        , 0 // context
+        , 0 // op func
+        , 0 // op context
+        );
+    ASSERT(!err);
 
-
-
-    
     while (1) { }
+}
+
+
+void
+app_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context) {
+    trickle_val = !trickle_val;
+    slice_t key = new_slice(dev_addr, 6);
+    slice_t val = new_slice(&trickle_val, 1);
+    trickle_value_write(toggle_get_instance(key), key, val, MAYFLY_CALL_ID_0);
+    // TODO ^
+}
+
+
+void
+read_address() {
+    addr_type = (address_type_t) (NRF_FICR->DEVICEADDRTYPE & 1);
+    *(uint32_t*)dev_addr = NRF_FICR->DEVICEADDR[0]; // 4 lowest uint8_ts
+    *(uint16_t*)(dev_addr+4) = (uint16_t) (NRF_FICR->DEVICEADDR[1] & low_mask(16)); // 2 higher uint8_ts
+    dev_addr[5] |= 0b11000000;
 }
 
 

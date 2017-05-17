@@ -21,9 +21,10 @@
 #define min(a,b) ((a) < (b) ? (a) : (b))
 
 
-// TODO .. this is duplicate from main.c
-int8_t dev_addr[] = {0xff, 0xee, 0xdd, 0xdd, 0xee, 0xff};
-address_type_t addr_type = ADDR_RANDOM;
+// TODO .. not a good solution
+
+extern uint8_t *dev_addr;
+extern address_type_t addr_type;
 
 
 /* Trickle instance */
@@ -76,7 +77,6 @@ write_quad(uint8_t *dest, uint32_t quad) {
 #define TRANSMISSION_TIME_US 500 // approximated time it takes to transmit
 #define TRANSMIT_TRY_INTERVAL_US 10000 // interval between each time we try to get a spot for transmission
 
-#define TICKER_PER_TRICKLE 3 // Instances of ticker per instance of trickle
 
 
 void
@@ -99,7 +99,6 @@ trickle_next_interval(trickle_t *trickle) {
 
 void
 trickle_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context) {
-
     trickle_t* trickle = (trickle_t*) context;
 
     toggle_line(21);
@@ -112,7 +111,7 @@ trickle_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, voi
             0, 0, // slot
             0, 1, // lazy, force
             0, 0);
-    ASSERT(err == TICKER_STATUS_SUCCESS || err == TICKER_STATUS_BUSY);
+    ASSERT(err != TICKER_STATUS_FAILURE);
 
     request_transmission(trickle);
 
@@ -122,17 +121,16 @@ trickle_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, voi
 
 
 void
-reset_timers(trickle_t *trickle) {
-
+reset_timers(trickle_t *trickle, uint8_t user_id) {
     // Stop periodic timer
     ticker_stop(RADIO_TICKER_INSTANCE_ID_RADIO // instance
-            , MAYFLY_CALL_ID_0 // user
+            , user_id // user
             , trickle->ticker_id // id
             , 0, 0); // operation fp & context
 
     // Start periodic timer
     uint32_t retval = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO // instance
-        , MAYFLY_CALL_ID_0 // user
+        , user_id // user
         , trickle->ticker_id // ticker id
         , ticker_ticks_now_get() // anchor point
         , TICKER_US_TO_TICKS(trickle_config.interval_min_us) // first interval
@@ -288,10 +286,13 @@ transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, vo
 // - `trickle_value_write` handles internal message
 // - both will call `value_register` to decide what is done with the data
 
+static uint32_t x = 0;
+
 void
-start_instance(trickle_t *instance) {
+start_instance(trickle_t *instance, uint8_t user_id) {
+    uint32_t ticker_id = instance->ticker_id;
     uint32_t err = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO // instance
-        , MAYFLY_CALL_ID_PROGRAM // user
+        , user_id // user
         , instance->ticker_id // ticker id
         , ticker_ticks_now_get() // anchor point
         , TICKER_US_TO_TICKS(trickle_config.interval_min_us) // first interval
@@ -304,19 +305,19 @@ start_instance(trickle_t *instance) {
         , 0 // op func
         , 0 // op context
         );
-    ASSERT(!err);
+    ASSERT(err != TICKER_STATUS_FAILURE);
 }
 void
-value_register(trickle_t *instance, slice_t key, slice_t new_val, trickle_version_t version) {
+value_register(trickle_t *instance, slice_t key, slice_t new_val, trickle_version_t version, uint32_t user_id) {
     // If local version is 0, it means the instance is unused and should be initialised
     if (instance->version == 0) {
-        start_instance(instance);
+        start_instance(instance, user_id);
     }
 
     
     if (version < instance->version) {
         instance->interval = trickle_config.interval_min_us;
-        reset_timers(instance);
+        reset_timers(instance, user_id);
     } else if (version > instance->version) {
         instance->version = version;
         slice_t val = trickle_config.get_val_fp((uint8_t*)instance);
@@ -326,7 +327,7 @@ value_register(trickle_t *instance, slice_t key, slice_t new_val, trickle_versio
         memcpy(val.ptr, new_val.ptr, new_val.len);
 
         instance->interval = trickle_config.interval_min_us;
-        reset_timers(instance);
+        reset_timers(instance, user_id);
     } else {
         instance->c_count ++;
     }
@@ -364,11 +365,12 @@ trickle_pdu_handle(uint8_t *packet_ptr, uint8_t packet_len) {
 
     trickle_t *instance = trickle_config.get_instance_fp(key);
 
-    value_register(instance, key, val, version);
+    value_register(instance, key, val, version, MAYFLY_CALL_ID_PROGRAM);
 }
 void
-trickle_value_write(trickle_t *instance, slice_t key, slice_t val) {
-    value_register(instance, key, val, instance->version + 1);
+trickle_value_write(trickle_t *instance, slice_t key, slice_t val, uint8_t user_id) {
+    uint32_t v = instance->version;
+    value_register(instance, key, val, instance->version + 1, user_id);
 }
 
 

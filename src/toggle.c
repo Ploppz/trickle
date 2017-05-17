@@ -1,5 +1,6 @@
 #include "trickle.h"
 #include <string.h>
+#include "nrf.h"
 
 // Structures, helper functions and interface for trickle
 
@@ -22,6 +23,7 @@ static uint16_t addresses_top = 0;
 */
 uint32_t
 toggle_get_index(slice_t address) {
+
     for (int i = 0; i < N_TRICKLE_NODES; i ++) {
         if (addresses[i].present) {
             if (memcmp(addresses[i].address, address.ptr, 6) == 0) {
@@ -34,6 +36,7 @@ toggle_get_index(slice_t address) {
 
     // The address is not found. Give it an index.
     uint32_t new_index = addresses_top++;
+    addresses[new_index].present = 1;
     memcpy(addresses[new_index].address, address.ptr, 6);
     return new_index;
 }
@@ -72,5 +75,7 @@ toggle_get_val(uint8_t *instance) {
 struct trickle_t*
 toggle_get_instance(slice_t key) {
     uint32_t i = toggle_get_index(new_slice(key.ptr, 6));
+    NRF_GPIO->OUTSET = (i & 0b11) << 23;
+    NRF_GPIO->OUTCLR = ((~i) & 0b11) << 23;
     return (struct trickle_t *) &instances[i];
 }

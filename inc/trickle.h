@@ -13,6 +13,9 @@ struct trickle_t;
 #define TRICKLE_T_SIZE 16
 
 
+#define TICKER_PER_TRICKLE 3 // Instances of ticker per instance of trickle
+
+
 // id of a trickle instance
 typedef uint32_t trickle_version_t;
 
@@ -53,7 +56,7 @@ trickle_pdu_handle(uint8_t *packet_ptr, uint8_t packet_len);
 
 // Write new data to an instance, incrementing the version number.
 void
-trickle_value_write(struct trickle_t *instance, slice_t key, slice_t val);
+trickle_value_write(struct trickle_t *instance, slice_t key, slice_t val, uint8_t user_id);
 
 // TODO no idea why there is not a linker error.... investigate!
 uint32_t 
