@@ -286,11 +286,9 @@ transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, vo
 // - `trickle_value_write` handles internal message
 // - both will call `value_register` to decide what is done with the data
 
-static uint32_t x = 0;
 
 void
 start_instance(trickle_t *instance, uint8_t user_id) {
-    uint32_t ticker_id = instance->ticker_id;
     uint32_t err = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO // instance
         , user_id // user
         , instance->ticker_id // ticker id

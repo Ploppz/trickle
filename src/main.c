@@ -43,8 +43,7 @@ void * const main_stack_top = main_stack + sizeof(main_stack);
 
 static uint8_t ALIGNED(4) ticker_nodes[TICKER_NODES][TICKER_NODE_T_SIZE];
 static uint8_t ALIGNED(4) ticker_users[MAYFLY_CALLER_COUNT][TICKER_USER_T_SIZE];
-static uint8_t ALIGNED(4) ticker_user_ops[TICKER_USER_OPS]
-                        [TICKER_USER_OP_T_SIZE];
+static uint8_t ALIGNED(4) ticker_user_ops[TICKER_USER_OPS][TICKER_USER_OP_T_SIZE];
 static uint8_t ALIGNED(4) rng[3 + 4 + 1];
 static uint8_t ALIGNED(4) radio[RADIO_MEM_MNG_SIZE];
 
@@ -142,9 +141,9 @@ int main(void)
     irq_priority_set(SWI4_IRQn, CONFIG_BLUETOOTH_CONTROLLER_JOB_PRIO);
     irq_enable(SWI4_IRQn);
 
-    ticker_users[MAYFLY_CALL_ID_0][0] = TICKER_USER_WORKER_OPS;
-    ticker_users[MAYFLY_CALL_ID_1][0] = TICKER_USER_JOB_OPS;
-    ticker_users[MAYFLY_CALL_ID_2][0] = 0;
+    ticker_users[MAYFLY_CALL_ID_0][0]       = TICKER_USER_WORKER_OPS;
+    ticker_users[MAYFLY_CALL_ID_1][0]       = TICKER_USER_JOB_OPS;
+    ticker_users[MAYFLY_CALL_ID_2][0]       = 0;
     ticker_users[MAYFLY_CALL_ID_PROGRAM][0] = TICKER_USER_APP_OPS;
 
     ticker_init(RADIO_TICKER_INSTANCE_ID_RADIO,
@@ -191,7 +190,12 @@ int main(void)
     slice_t val = new_slice(&trickle_val, 1);
     trickle_value_write(toggle_get_instance(key), key, val, MAYFLY_CALL_ID_PROGRAM);
 
-#if 0
+    int x  = 5;
+    for (int i = 0; i < 10; i ++) {
+        x++;
+    }
+
+#if 1
 #define PERIOD_MS 1000
     uint32_t err = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO // instance
         , MAYFLY_CALL_ID_PROGRAM // user
@@ -210,14 +214,32 @@ int main(void)
     ASSERT(!err);
 #endif
 
-    while (1) { }
+    while (1) { 
+        uint16_t handle = 0;
+        struct radio_pdu_node_rx *node_rx = 0;
+
+        toggle_line(14);
+
+        uint8_t num_complete = radio_rx_get(&node_rx, &handle);
+
+        if (node_rx) {
+            radio_rx_dequeue();
+            // Handle PDU
+            trickle_pdu_handle(&node_rx->pdu_data[9], node_rx->pdu_data[1] - 6);
+
+            toggle_line(13);
+            //
+            node_rx->hdr.onion.next = 0;
+            radio_rx_mem_release(&node_rx);
+        }
+    }
 }
 
 
 void
 app_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context) {
     trickle_val = !trickle_val;
-    /* For test: no significant action here
+    /*
     slice_t key = new_slice(dev_addr, 6);
     slice_t val = new_slice(&trickle_val, 1);
     trickle_value_write(toggle_get_instance(key), key, val, MAYFLY_CALL_ID_0);
@@ -239,23 +261,6 @@ read_address() {
 // Will be called when a packet has been received
 void radio_event_callback(void)
 {
-    uint16_t handle = 0;
-    struct radio_pdu_node_rx *node_rx = 0;
-
-    toggle_line(14);
-
-    uint8_t num_complete = radio_rx_get(&node_rx, &handle);
-
-    if (node_rx) {
-        radio_rx_dequeue();
-        // Handle PDU
-        trickle_pdu_handle(&node_rx->pdu_data[9], node_rx->pdu_data[1] - 6);
-
-        toggle_line(13);
-        //
-        node_rx->hdr.onion.next = 0;
-        radio_rx_mem_release(&node_rx);
-    }
 }
 
 void toggle_line(uint32_t line)
