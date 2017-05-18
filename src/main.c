@@ -186,15 +186,6 @@ int main(void)
 
     toggle_app_init();
 
-    slice_t key = new_slice(dev_addr, 6);
-    slice_t val = new_slice(&trickle_val, 1);
-    trickle_value_write(toggle_get_instance(key), key, val, MAYFLY_CALL_ID_PROGRAM);
-
-    int x  = 5;
-    for (int i = 0; i < 10; i ++) {
-        x++;
-    }
-
 #if 1
 #define PERIOD_MS 1000
     uint32_t err = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO // instance
@@ -239,11 +230,9 @@ int main(void)
 void
 app_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context) {
     trickle_val = !trickle_val;
-    /*
     slice_t key = new_slice(dev_addr, 6);
     slice_t val = new_slice(&trickle_val, 1);
     trickle_value_write(toggle_get_instance(key), key, val, MAYFLY_CALL_ID_0);
-    */
 }
 
 
