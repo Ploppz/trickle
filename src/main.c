@@ -34,7 +34,7 @@ uint8_t __noinit main_stack[2048];
 void * const isr_stack_top = isr_stack + sizeof(isr_stack);
 void * const main_stack_top = main_stack + sizeof(main_stack);
 
-#define TICKER_NODES (RADIO_TICKER_NODES + 1 + TICKER_PER_TRICKLE * N_TRICKLE_INSTANCES)
+#define TICKER_NODES (RADIO_TICKER_NODES + 1 + TICKER_PER_TRICKLE * N_TRICKLE_INSTANCES + 20)
 
 #define TICKER_USER_WORKER_OPS (RADIO_TICKER_USER_WORKER_OPS)
 #define TICKER_USER_JOB_OPS (RADIO_TICKER_USER_JOB_OPS)
@@ -189,8 +189,9 @@ int main(void)
 
     slice_t key = new_slice(dev_addr, 6);
     slice_t val = new_slice(&trickle_val, 1);
-    trickle_value_write(toggle_get_instance(key), key, val, MAYFLY_CALL_ID_0);
+    trickle_value_write(toggle_get_instance(key), key, val, MAYFLY_CALL_ID_PROGRAM);
 
+#if 0
 #define PERIOD_MS 1000
     uint32_t err = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO // instance
         , MAYFLY_CALL_ID_PROGRAM // user
@@ -207,6 +208,7 @@ int main(void)
         , 0 // op context
         );
     ASSERT(!err);
+#endif
 
     while (1) { }
 }
@@ -215,10 +217,11 @@ int main(void)
 void
 app_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context) {
     trickle_val = !trickle_val;
+    /* For test: no significant action here
     slice_t key = new_slice(dev_addr, 6);
     slice_t val = new_slice(&trickle_val, 1);
     trickle_value_write(toggle_get_instance(key), key, val, MAYFLY_CALL_ID_0);
-    // TODO ^
+    */
 }
 
 
