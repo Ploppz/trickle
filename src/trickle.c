@@ -365,7 +365,9 @@ trickle_pdu_handle(uint8_t *packet_ptr, uint8_t packet_len) {
 
     trickle_t *instance = trickle_config.get_instance_fp(key);
 
-    printf("External (key: %x,%x,%x,%x,%x,%x, val: %x)\n", key.ptr[0], key.ptr[1], key.ptr[2], key.ptr[3], key.ptr[4], key.ptr[5], val.ptr[0]);
+    if (version > instance->version) {
+        printf("External (key: %x,%x,%x,%x,%x,%x, val: %x)\n", key.ptr[0], key.ptr[1], key.ptr[2], key.ptr[3], key.ptr[4], key.ptr[5], val.ptr[0]);
+    }
     value_register(instance, key, val, version, MAYFLY_CALL_ID_PROGRAM);
 }
 void
