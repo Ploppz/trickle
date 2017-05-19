@@ -103,7 +103,7 @@ address_type_t addr_type;
 int main(void)
 {
     uint32_t retval;
-    SEGGER_RTT_printf(0, "Hello World %d!\n", 42);
+    printf("Hello World %d!\n", 42);
 
     DEBUG_INIT();
 
@@ -181,7 +181,7 @@ int main(void)
 
     // TODO passive (0)
 #if 1
-    ll_scan_params_set(1, SCAN_INTERVAL, SCAN_WINDOW, addr_type, SCAN_FILTER_POLICY);
+    ll_scan_params_set(0, SCAN_INTERVAL, SCAN_WINDOW, addr_type, SCAN_FILTER_POLICY);
     retval = ll_scan_enable(1);
     ASSERT(!retval);
 #endif
