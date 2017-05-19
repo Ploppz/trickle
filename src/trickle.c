@@ -23,7 +23,7 @@
 
 // TODO .. not a good solution
 
-extern uint8_t *dev_addr;
+extern uint8_t dev_addr[6];
 extern address_type_t addr_type;
 
 

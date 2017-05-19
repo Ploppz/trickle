@@ -36,9 +36,9 @@ void * const main_stack_top = main_stack + sizeof(main_stack);
 
 #define TICKER_NODES (RADIO_TICKER_NODES + 1 + TICKER_PER_TRICKLE * N_TRICKLE_INSTANCES + 20)
 
-#define TICKER_USER_WORKER_OPS (RADIO_TICKER_USER_WORKER_OPS)
+#define TICKER_USER_WORKER_OPS (RADIO_TICKER_USER_WORKER_OPS + 5)
 #define TICKER_USER_JOB_OPS (RADIO_TICKER_USER_JOB_OPS)
-#define TICKER_USER_APP_OPS (RADIO_TICKER_USER_APP_OPS)
+#define TICKER_USER_APP_OPS (RADIO_TICKER_USER_APP_OPS + 5)
 #define TICKER_USER_OPS (TICKER_USER_WORKER_OPS + TICKER_USER_JOB_OPS + TICKER_USER_APP_OPS)
 
 static uint8_t ALIGNED(4) ticker_nodes[TICKER_NODES][TICKER_NODE_T_SIZE];
@@ -95,7 +95,7 @@ void read_address();
 
 static uint8_t trickle_val = 0;
 
-int8_t dev_addr[6];
+uint8_t dev_addr[6];
 address_type_t addr_type;
 
 int main(void)
@@ -149,7 +149,7 @@ int main(void)
     ticker_init(RADIO_TICKER_INSTANCE_ID_RADIO,
             TICKER_NODES, &ticker_nodes[0],
             MAYFLY_CALLER_COUNT, &ticker_users[0],
-            RADIO_TICKER_USER_OPS, &ticker_user_ops[0]);
+            TICKER_USER_OPS, &ticker_user_ops[0]);
 
     rand_init(rng, sizeof(rng));
     irq_priority_set(RNG_IRQn, 0xFF);
@@ -177,7 +177,7 @@ int main(void)
     ll_scan_data_set(sizeof(scn_data), scn_data);
 
     // TODO passive (0)
-#if 0
+#if 1
     ll_scan_params_set(1, SCAN_INTERVAL, SCAN_WINDOW, addr_type, SCAN_FILTER_POLICY);
     retval = ll_scan_enable(1);
     ASSERT(!retval);
