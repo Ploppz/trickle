@@ -4,6 +4,8 @@
 #include "toggle.h"
 #include "positioning.h"
 
+#include "SEGGER_RTT_Conf.h"
+#include "SEGGER_RTT.h"
 
 #include "soc.h"
 #include "cpu.h"
@@ -101,6 +103,7 @@ address_type_t addr_type;
 int main(void)
 {
     uint32_t retval;
+    SEGGER_RTT_WriteString(0, "Hello World!\n");
 
     DEBUG_INIT();
 
