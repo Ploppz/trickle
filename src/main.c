@@ -4,7 +4,6 @@
 #include "toggle.h"
 #include "positioning.h"
 
-#include "SEGGER_RTT_Conf.h"
 #include "SEGGER_RTT.h"
 
 #include "soc.h"
@@ -38,9 +37,9 @@ void * const main_stack_top = main_stack + sizeof(main_stack);
 
 #define TICKER_NODES (RADIO_TICKER_NODES + 1 + TICKER_PER_TRICKLE * N_TRICKLE_INSTANCES + 20)
 
-#define TICKER_USER_WORKER_OPS (RADIO_TICKER_USER_WORKER_OPS + 5)
-#define TICKER_USER_JOB_OPS (RADIO_TICKER_USER_JOB_OPS)
-#define TICKER_USER_APP_OPS (RADIO_TICKER_USER_APP_OPS + 5)
+#define TICKER_USER_WORKER_OPS (RADIO_TICKER_USER_WORKER_OPS + 7)
+#define TICKER_USER_JOB_OPS (RADIO_TICKER_USER_JOB_OPS + 7)
+#define TICKER_USER_APP_OPS (RADIO_TICKER_USER_APP_OPS + 7)
 #define TICKER_USER_OPS (TICKER_USER_WORKER_OPS + TICKER_USER_JOB_OPS + TICKER_USER_APP_OPS)
 
 static uint8_t ALIGNED(4) ticker_nodes[TICKER_NODES][TICKER_NODE_T_SIZE];
@@ -50,8 +49,8 @@ static uint8_t ALIGNED(4) rng[3 + 4 + 1];
 static uint8_t ALIGNED(4) radio[RADIO_MEM_MNG_SIZE];
 
 
-#define SCAN_INTERVAL      0x0100 // 160 ms
-#define SCAN_WINDOW        0x0050 // 50 ms
+#define SCAN_INTERVAL      0x0010 // 160 ms
+#define SCAN_WINDOW        0x000e // 50 ms
 #define SCAN_FILTER_POLICY 0
 
 #define TICKER_ID_APP (RADIO_TICKER_NODES)

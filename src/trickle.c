@@ -1,6 +1,6 @@
-#include "nrf.h"
-
 #include <string.h>
+#include "nrf.h"
+#include "SEGGER_RTT.h"
 // Trickle
 #include "trickle.h"
 #include "tx.h"
@@ -309,6 +309,7 @@ void
 value_register(trickle_t *instance, slice_t key, slice_t new_val, trickle_version_t version, uint32_t user_id) {
     // If local version is 0, it means the instance is unused and should be initialised
     if (instance->version == 0) {
+        printf(" == Start instance (key: %x,%x,%x,%x,%x,%x)\n", key.ptr[0], key.ptr[1], key.ptr[2], key.ptr[3], key.ptr[4], key.ptr[5]);
         start_instance(instance, user_id);
     }
 
@@ -361,13 +362,17 @@ trickle_pdu_handle(uint8_t *packet_ptr, uint8_t packet_len) {
         return;
     }
 
+
     trickle_t *instance = trickle_config.get_instance_fp(key);
 
+    printf("External (key: %x,%x,%x,%x,%x,%x, val: %x)\n", key.ptr[0], key.ptr[1], key.ptr[2], key.ptr[3], key.ptr[4], key.ptr[5], val.ptr[0]);
     value_register(instance, key, val, version, MAYFLY_CALL_ID_PROGRAM);
 }
 void
 trickle_value_write(trickle_t *instance, slice_t key, slice_t val, uint8_t user_id) {
     uint32_t v = instance->version;
+
+    printf("Internal (key: %x,%x,%x,%x,%x,%x, val: %x)\n", key.ptr[0], key.ptr[1], key.ptr[2], key.ptr[3], key.ptr[4], key.ptr[5], val.ptr[0]);
     value_register(instance, key, val, instance->version + 1, user_id);
 }
 
