@@ -83,6 +83,7 @@
     <folder Name="RTT">
       <file file_name="ses/SEGGER_RTT.c" />
       <file file_name="ses/SEGGER_RTT_SES.c" />
+      <file file_name="ses/SEGGER_RTT_printf.c" />
     </folder>
   </project>
   <configuration

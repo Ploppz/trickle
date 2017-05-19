@@ -103,7 +103,7 @@ address_type_t addr_type;
 int main(void)
 {
     uint32_t retval;
-    SEGGER_RTT_WriteString(0, "Hello World!\n");
+    SEGGER_RTT_printf(0, "Hello World %d!\n", 42);
 
     DEBUG_INIT();
 
