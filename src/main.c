@@ -78,8 +78,8 @@ int main(void)
     DEBUG_INIT();
 
     /* Dongle RGB LED */
-    NRF_GPIO->DIRSET = (0b1111 << 21) | (1 << 10) | (1 << 11) | (1 << 12) | (1 << 16) | (1 << 17) | (1 << 18) | (1 << 19) | (1 << 20);
-    NRF_GPIO->OUTSET = (0b1111 << 21) | (1 << 10) | (1 << 11) | (1 << 12) | (1 << 16) | (1 << 17) | (1 << 18) | (1 << 19) | (1 << 20);
+    NRF_GPIO->DIRSET = (0b1111 << 21) | (1 << 1) | (1 << 2) | (1 << 3) | (1 << 4) | (1 << 10) | (1 << 11) | (1 << 12) | (1 << 16) | (1 << 17) | (1 << 18) | (1 << 19) | (1 << 20);
+    NRF_GPIO->OUTSET = (0b1111 << 21) | (1 << 1) | (1 << 2) | (1 << 3) | (1 << 4) | (1 << 10) | (1 << 11) | (1 << 12) | (1 << 16) | (1 << 17) | (1 << 18) | (1 << 19) | (1 << 20);
 
     NRF_GPIO->DIRSET = (1 << 15);
     NRF_GPIO->OUTSET = (1 << 15);
@@ -139,14 +139,20 @@ int main(void)
     ASSERT(!retval);
 
     // TODO: if we put this line before scanning init, the app won't run in normal mode, only debug.
-    trickle_init(TICKER_ID_TRICKLE, 2, 2001, 2);
+    trickle_init(TICKER_ID_TRICKLE, 8, 2000, 2);
 
     uint8_t data[50] = {3, 1, 2, 3};
     set_data(0, data);
 
 
     
-    while (1) { }
+    while (1) { 
+        if(NRF_RADIO->STATE == 3 || NRF_RADIO->STATE == 2 || NRF_RADIO->STATE == 1){
+            NRF_GPIO->OUTSET = (1 << 2);
+        }else{
+            NRF_GPIO->OUTCLR = (1 << 2);
+        }
+    }
 }
 
 

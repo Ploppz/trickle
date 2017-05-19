@@ -254,13 +254,16 @@ transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, vo
         memcpy(tx_packet + PDU_HDR_LEN + data_len1, ((uint8_t*)trickle->data) + 1, data_len2);
     }
     write_pdu_header(PDU_TYPE_ADV_IND, data_len1+data_len2, addr_type, dev_addr, tx_packet);
-
+    
+    
     // Transmission
     start_hfclk();
     configure_radio(tx_packet, 37, ADV_CH37);
+    toggle_line(1);
     transmit(tx_packet, ADV_CH37);
     // Debugging
     toggle_line(22);
+    toggle_line(1);
 
     // The timer has done its job...
     ticker_stop(RADIO_TICKER_INSTANCE_ID_RADIO // instance
