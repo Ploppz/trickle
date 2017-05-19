@@ -58,7 +58,7 @@ get_double_index(uint8_t *instance, uint16_t *i, uint16_t *j) {
 // Generate key based on the index of the trickle instance in the array
 // Return number of bytes written do `dest`
 uint8_t
-get_key(uint8_t *instance, uint8_t *dest) {
+positioning_get_key(uint8_t *instance, uint8_t *dest) {
     uint16_t i, j;
     get_double_index(instance, &i, &j);
     // Copy the addresses to dest
@@ -69,13 +69,13 @@ get_key(uint8_t *instance, uint8_t *dest) {
 
 // Write data of a trickle instance to `dest`. Returns bytes written
 slice_t
-get_val(uint8_t *instance) {
+positioning_get_val(uint8_t *instance) {
     uint16_t i, j;
     get_double_index(instance, &i, &j);
     return new_slice(&values[i][j], 1);
 }
 struct trickle_t*
-get_instance(slice_t key) {
+positioning_get_instance(slice_t key) {
     uint32_t i = get_index(new_slice(key.ptr,     6));
     uint32_t j = get_index(new_slice(key.ptr + 6, 6));
     return (struct trickle_t *) &instances[i][j];

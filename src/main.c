@@ -1,7 +1,6 @@
 #include "trickle.h"
 #include "tx.h"
 #include "slice.h"
-#include "toggle.h"
 #include "positioning.h"
 
 #include "SEGGER_RTT.h"
@@ -35,7 +34,7 @@ uint8_t __noinit main_stack[2048];
 void * const isr_stack_top = isr_stack + sizeof(isr_stack);
 void * const main_stack_top = main_stack + sizeof(main_stack);
 
-#define TICKER_NODES (RADIO_TICKER_NODES + 1 + TICKER_PER_TRICKLE * N_TRICKLE_INSTANCES + 20)
+#define TICKER_NODES (RADIO_TICKER_NODES + 1 + TICKER_PER_TRICKLE * N_TRICKLE_INSTANCES)
 
 #define TICKER_USER_WORKER_OPS (RADIO_TICKER_USER_WORKER_OPS + 7)
 #define TICKER_USER_JOB_OPS (RADIO_TICKER_USER_JOB_OPS + 7)
@@ -48,6 +47,7 @@ static uint8_t ALIGNED(4) ticker_user_ops[TICKER_USER_OPS][TICKER_USER_OP_T_SIZE
 static uint8_t ALIGNED(4) rng[3 + 4 + 1];
 static uint8_t ALIGNED(4) radio[RADIO_MEM_MNG_SIZE];
 
+#define MEMSIZE  sizeof(ticker_nodes) + sizeof(ticker_users) + sizeof(ticker_user_ops) + sizeof(radio)
 
 #define SCAN_INTERVAL      0x0010 // 160 ms
 #define SCAN_WINDOW        0x000e // 50 ms
@@ -61,6 +61,11 @@ static uint8_t ALIGNED(4) radio[RADIO_MEM_MNG_SIZE];
 // Trickle //
 /////////////
 
+// Macro to construct {APP_NAME}_{FN_NAME}
+#define CAT(x, y) CAT_(x, y)
+#define CAT_(x, y) x ## y
+#define APP_FN(FN_NAME) CAT(CAT(APP_NAME, _), FN_NAME)
+
 trickle_config_t trickle_config = {
     .interval_min_us = 1000,
     .interval_max_us = 1000000,
@@ -68,9 +73,9 @@ trickle_config_t trickle_config = {
     
     .first_ticker_id =  TICKER_ID_TRICKLE,
 
-    .get_key_fp = &toggle_get_key,
-    .get_val_fp = &toggle_get_val,
-    .get_instance_fp = &toggle_get_instance,
+    .get_key_fp = &APP_FN(get_key),
+    .get_val_fp = &APP_FN(get_val),
+    .get_instance_fp = &APP_FN(get_instance),
 };
 
 //////////////////
@@ -101,6 +106,7 @@ address_type_t addr_type;
 
 int main(void)
 {
+    uint32_t a = MEMSIZE;
     uint32_t retval;
     printf("Hello World %d!\n", 42);
 
@@ -187,7 +193,7 @@ int main(void)
 #endif
 
 
-    toggle_app_init();
+    APP_FN(init)();
 
 #if 1
 #define PERIOD_MS 1000
@@ -241,7 +247,7 @@ app_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *c
     trickle_val = !trickle_val;
     slice_t key = new_slice(dev_addr, 6);
     slice_t val = new_slice(&trickle_val, 1);
-    trickle_value_write(toggle_get_instance(key), key, val, MAYFLY_CALL_ID_0);
+    trickle_value_write(trickle_config.get_instance_fp(key), key, val, MAYFLY_CALL_ID_0);
 }
 
 
