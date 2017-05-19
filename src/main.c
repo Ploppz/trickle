@@ -3,6 +3,7 @@
 #include "slice.h"
 #include "toggle.h"
 #include "positioning.h"
+#include "outbox.h"
 
 
 #include "soc.h"
@@ -56,9 +57,9 @@ static uint8_t ALIGNED(4) radio[RADIO_MEM_MNG_SIZE];
 #define TICKER_ID_TRICKLE (RADIO_TICKER_NODES+1)
 
 
-/////////////
-// Trickle //
-/////////////
+////////////
+// Config //
+////////////
 
 trickle_config_t trickle_config = {
     .interval_min_us = 1000,
@@ -70,6 +71,12 @@ trickle_config_t trickle_config = {
     .get_key_fp = &toggle_get_key,
     .get_val_fp = &toggle_get_val,
     .get_instance_fp = &toggle_get_instance,
+};
+
+
+outbox_config_t outbox_config = {
+    .bt_channel = 37,
+    .rf_channel = ADV_CH37,
 };
 
 //////////////////
@@ -104,12 +111,38 @@ int main(void)
 
     DEBUG_INIT();
 
-    /* Dongle RGB LED */
-    NRF_GPIO->DIRSET = (0b1111 << 21) | (1 << 10) | (1 << 11) | (1 << 12) | (1 << 16) | (1 << 17) | (1 << 18) | (1 << 19) | (1 << 20);
-    NRF_GPIO->OUTSET = (0b1111 << 21) | (1 << 10) | (1 << 11) | (1 << 12) | (1 << 16) | (1 << 17) | (1 << 18) | (1 << 19) | (1 << 20);
+    // pins 10-12, 16-24
+    uint32_t out_pins = 0b111111111000111 << 10;
+    NRF_GPIO->DIRSET = out_pins;
+    NRF_GPIO->OUTSET = out_pins;
 
     NRF_GPIO->DIRSET = (1 << 15);
     NRF_GPIO->OUTSET = (1 << 15);
+
+    init_ppi();
+
+    { // Testing outbox
+        packet_t *packet = start_packet();
+        uint8_t *packet_ptr = packet->data;
+        packet_ptr += PDU_HDR_LEN;
+        uint8_t *packet_start_ptr = packet_ptr;
+        *(packet_ptr++) = 0;
+        *(packet_ptr++) = 0x11;
+        *(packet_ptr++) = 0x22;
+        *(packet_ptr++) = 0x33;
+        *(packet_ptr++) = 0x44;
+        *(packet_ptr++) = 0x55;
+        *(packet_ptr++) = 0x66;
+        *(packet_ptr++) = 0x77;
+        *(packet_ptr++) = 0x88;
+
+        write_pdu_header(PDU_TYPE_ADV_IND, packet_ptr - packet_start_ptr, addr_type, dev_addr, packet_start_ptr);
+
+        finalize_packet(packet);
+        schedule();
+
+        while (1) {}
+    }
 
 
     #if UART
@@ -128,7 +161,6 @@ int main(void)
 
     /* Mayfly shall be initialized before any ISR executes */
     mayfly_init();
-    //init_ppi();
 
     clock_k32src_start(1);
     irq_priority_set(POWER_CLOCK_IRQn, 0xFF);
@@ -333,6 +365,7 @@ void rng_handler(void)
 void radio_handler(void)
 {
     isr_radio(0);
+    outbox_isr_radio();
 }
 
 void mayfly_enable_cb(uint8_t caller_id, uint8_t callee_id, uint8_t enable)
