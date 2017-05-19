@@ -107,9 +107,10 @@ int main(void)
     DEBUG_INIT();
 
     /* Dongle RGB LED */
-    NRF_GPIO->DIRSET = (0b1111 << 21) | (1 << 10) | (1 << 11) | (1 << 12) | (1 << 16) | (1 << 17) | (1 << 18) | (1 << 19) | (1 << 20);
-    NRF_GPIO->OUTSET = (0b1111 << 21) | (1 << 10) | (1 << 11) | (1 << 12) | (1 << 16) | (1 << 17) | (1 << 18) | (1 << 19) | (1 << 20);
-
+    NRF_GPIO->DIRSET = (0b1111 << 21) | (1 << 1) | (1 << 2) | (1 << 3) | (1 << 4) | (1 << 10) | (1 << 11) | (1 << 12) | (1 << 16) | (1 << 17) | (1 << 18) | (1 << 19) | (1 << 20);
+    NRF_GPIO->OUTSET = (0b1111 << 21) | (1 << 1) | (1 << 2) | (1 << 3) | (1 << 4) | (1 << 10) | (1 << 11) | (1 << 12) | (1 << 16) | (1 << 17) | (1 << 18) | (1 << 19) | (1 << 20);
+    
+    NRF_GPIO->OUTCLR = (1 << 1);
     NRF_GPIO->DIRSET = (1 << 15);
     NRF_GPIO->OUTSET = (1 << 15);
 
@@ -224,6 +225,12 @@ int main(void)
             //
             node_rx->hdr.onion.next = 0;
             radio_rx_mem_release(&node_rx);
+        }
+
+        if (NRF_RADIO->STATE == 3 || NRF_RADIO->STATE == 2 || NRF_RADIO->STATE == 1) {
+            NRF_GPIO->OUTSET = (1 << 2);
+        } else {
+            NRF_GPIO->OUTCLR = (1 << 2);
         }
     }
 }

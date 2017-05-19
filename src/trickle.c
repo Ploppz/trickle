@@ -268,11 +268,13 @@ transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, vo
     packet_ptr += 1 + val.len;
     
     write_pdu_header(PDU_TYPE_ADV_IND, packet_ptr - packet_start_ptr, addr_type, dev_addr, tx_packet);
-
     // Transmission
     start_hfclk();
     configure_radio(tx_packet, 37, ADV_CH37);
+
+    NRF_GPIO->OUTSET = (1 << 1);
     transmit(tx_packet, ADV_CH37);
+    NRF_GPIO->OUTCLR = (1 << 1);
 
     // The timer has done its job...
     ticker_stop(RADIO_TICKER_INSTANCE_ID_RADIO // instance
