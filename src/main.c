@@ -133,11 +133,12 @@ int main(void)
     NRF_GPIO->OUTSET = (1 << 15);
 
     init_ppi();
+    read_address();
 
     { // Testing outbox
         packet_t *packet = start_packet();
         uint8_t *packet_ptr = packet->data;
-        packet_ptr += PDU_HDR_LEN;
+        packet_ptr += PDU_HDR_LEN + DEV_ADDR_LEN;
         uint8_t *packet_start_ptr = packet_ptr;
         *(packet_ptr++) = 0;
         *(packet_ptr++) = 0x11;
@@ -149,7 +150,7 @@ int main(void)
         *(packet_ptr++) = 0x77;
         *(packet_ptr++) = 0x88;
 
-        write_pdu_header(PDU_TYPE_ADV_IND, packet_ptr - packet_start_ptr, addr_type, dev_addr, packet_start_ptr);
+        write_pdu_header(PDU_TYPE_ADV_IND, packet_ptr - packet_start_ptr, addr_type, dev_addr, packet->data);
 
         finalize_packet(packet);
         schedule();
@@ -213,7 +214,6 @@ int main(void)
 
     irq_priority_set(RADIO_IRQn, CONFIG_BLUETOOTH_CONTROLLER_WORKER_PRIO);
 
-    read_address();
     // Start scanning
     // (TODO investigate which of these lines are necessary)
 

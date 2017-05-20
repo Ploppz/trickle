@@ -26,4 +26,8 @@ start_packet();
 void
 finalize_packet(packet_t *handle);
 
+
+
+void
+outbox_isr_radio();
 #endif

@@ -82,7 +82,8 @@ schedule() {
 
 packet_t *
 start_packet() {
-    return push();
+    packet_t *ptr = push();
+    return ptr;
 }
 
 // Signal that the packet is done - no more writing
