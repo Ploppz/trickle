@@ -50,10 +50,10 @@ positioning_init() {
    Note: In this application, a key consists of two 6-byte addresses.
 */
 uint32_t
-get_index(slice_t address) {
+get_index(uint8_t *address) {
     for (int i = 0; i < N_TRICKLE_NODES; i ++) {
         if (addresses[i].present) {
-            if (memcmp(addresses[i].address, address.ptr, 6) == 0) {
+            if (memcmp(addresses[i].address, address, 6) == 0) {
                 return i;
             }
         } else {
@@ -67,7 +67,7 @@ get_index(slice_t address) {
         // Max number of addresses reached
         return ~0;
     }
-    memcpy(addresses[new_index].address, address.ptr, 6);
+    memcpy(addresses[new_index].address, address, 6);
     addresses[new_index].present = 1;
     return new_index;
 }
@@ -124,17 +124,14 @@ positioning_get_instance(slice_t key) {
             && memcmp(key.ptr+2, dev_addr, 6) != 0) {
         return 0;
     }
-    uint32_t i = get_index(new_slice(key.ptr + 2, 6));
-    uint32_t j = get_index(new_slice(key.ptr + 8, 6));
+    uint32_t i = get_index(key.ptr + 2);
+    uint32_t j = get_index(key.ptr + 8);
     if (i == ~0 || j == ~0) {
         // Max number of addresses reached
         return 0;
     }
     return (struct trickle_t *) &instances[i][j];
 }
-
-
-
 
 void
 positioning_register_rssi(uint8_t rssi, uint8_t *other_dev_addr) {
@@ -147,5 +144,18 @@ positioning_register_rssi(uint8_t rssi, uint8_t *other_dev_addr) {
     if (instance) {
         slice_t val = new_slice(&rssi, 1);
         trickle_value_write(instance, key, val, MAYFLY_CALL_ID_PROGRAM);
+    }
+}
+
+uint8_t
+is_positioning_node(uint8_t *address) {
+    for (int i = 0; i < N_TRICKLE_NODES; i ++) {
+        if (addresses[i].present) {
+            if (memcmp(addresses[i].address, address, 6) == 0) {
+                return 1;
+            }
+        } else {
+            return 0;
+        }
     }
 }

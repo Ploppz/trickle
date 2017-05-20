@@ -45,6 +45,8 @@ void * const main_stack_top = main_stack + sizeof(main_stack);
 static uint8_t ALIGNED(4) ticker_nodes[TICKER_NODES][TICKER_NODE_T_SIZE];
 static uint8_t ALIGNED(4) ticker_users[MAYFLY_CALLER_COUNT][TICKER_USER_T_SIZE];
 static uint8_t ALIGNED(4) ticker_user_ops[TICKER_USER_OPS][TICKER_USER_OP_T_SIZE];
+
+
 static uint8_t ALIGNED(4) rng[3 + 4 + 1];
 static uint8_t ALIGNED(4) radio[RADIO_MEM_MNG_SIZE];
 
@@ -261,8 +263,10 @@ positioning_run() {
             
             trickle_pdu_handle(&node_rx->pdu_data[PDU_HDR_LEN + DEV_ADDR_LEN], pdu_len - 6);
 
-            uint8_t rssi = node_rx->pdu_data[pdu_len + PDU_HDR_LEN];
-            positioning_register_rssi(rssi, &node_rx->pdu_data[PDU_HDR_LEN]);
+            if (is_positioning_node(&node_rx->pdu_data[PDU_HDR_LEN])) {
+                uint8_t rssi = node_rx->pdu_data[pdu_len + PDU_HDR_LEN];
+                positioning_register_rssi(rssi, &node_rx->pdu_data[PDU_HDR_LEN]);
+            }
 
             node_rx->hdr.onion.next = 0;
             radio_rx_mem_release(&node_rx);

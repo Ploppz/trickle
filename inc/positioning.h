@@ -17,4 +17,7 @@ positioning_get_instance(slice_t key);
 void
 positioning_register_rssi(uint8_t rssi, uint8_t *other_dev_addr);
 
+uint8_t
+is_positioning_node(uint8_t *addr);
+
 #endif
