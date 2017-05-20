@@ -320,7 +320,7 @@ void
 value_register(trickle_t *instance, slice_t key, slice_t new_val, trickle_version_t version, uint32_t user_id) {
     // If local version is 0, it means the instance is unused and should be initialised
     if (instance->version == 0) {
-        printf(" == Start instance (key: "); print_slice(key); printf(")\n");
+        printf(" == Start instance (ticker_id: %d, key: ", instance->ticker_id); print_slice(key); printf(")\n");
         start_instance(instance, user_id);
     }
 
@@ -375,21 +375,24 @@ trickle_pdu_handle(uint8_t *packet_ptr, uint8_t packet_len) {
 
 
     trickle_t *instance = trickle_config.get_instance_fp(key);
-
-    if (version > instance->version) {
-        printf("External (key: "); print_slice(key); printf(", val: "); print_slice(val); printf(")\n");
+    if (instance) {
+        if (version > instance->version) {
+            printf("External (key: "); print_slice(key); printf(", val: "); print_slice(val); printf(")\n");
+        }
+        value_register(instance, key, val, version, MAYFLY_CALL_ID_PROGRAM);
     }
-    value_register(instance, key, val, version, MAYFLY_CALL_ID_PROGRAM);
 }
+
 void
 trickle_value_write(trickle_t *instance, slice_t key, slice_t val, uint8_t user_id) {
-    uint32_t v = instance->version;
-
     printf("Internal (key: "); print_slice(key); printf(", val: "); print_slice(val); printf(")\n");
-    value_register(instance, key, val, instance->version + 1, user_id);
+
+    slice_t old_val = trickle_config.get_val_fp(instance);
+    if (memcmp(val.ptr, old_val.ptr, val.len)) {
+        // Only register value if it's not equal to the old value.
+        value_register(instance, key, val, instance->version + 1, user_id);
+    }
 }
-
-
 
 uint32_t
 get_t_value(trickle_t *trickle){

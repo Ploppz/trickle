@@ -49,8 +49,8 @@ static uint8_t ALIGNED(4) rng[3 + 4 + 1];
 static uint8_t ALIGNED(4) radio[RADIO_MEM_MNG_SIZE];
 
 
-#define SCAN_INTERVAL      0x0010 // 160 ms
-#define SCAN_WINDOW        0x000e // 50 ms
+#define SCAN_INTERVAL      0x0010 // 10 ms
+#define SCAN_WINDOW        0x000e // 8.75 ms
 #define SCAN_FILTER_POLICY 0
 
 #define TICKER_ID_APP (RADIO_TICKER_NODES)
@@ -96,8 +96,11 @@ void gpiote_out_init(uint32_t index, uint32_t pin, uint32_t polarity, uint32_t i
 void init_ppi();
 uint32_t low_mask(uint8_t n);
 uint32_t rand_range(uint32_t min, uint32_t max);
-void app_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context);
 void read_address();
+
+// Applications
+void toggle_run();
+void positioning_run();
 
 static uint8_t trickle_val = 0;
 
@@ -107,8 +110,6 @@ address_type_t addr_type;
 int main(void)
 {
     uint32_t retval;
-    printf("Hello World %d!\n", 42);
-
     DEBUG_INIT();
 
     /* Dongle RGB LED */
@@ -184,17 +185,25 @@ int main(void)
     ll_address_set(addr_type, dev_addr);
     ll_scan_data_set(sizeof(scn_data), scn_data);
 
-    // TODO passive (0)
-#if 1
     ll_scan_params_set(0, SCAN_INTERVAL, SCAN_WINDOW, addr_type, SCAN_FILTER_POLICY);
     retval = ll_scan_enable(1);
     ASSERT(!retval);
-#endif
-
 
     APP_FN(init)();
+    APP_FN(run)();
+}
 
-#if 1
+
+void
+toggle_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context) {
+    trickle_val = !trickle_val;
+    slice_t key = new_slice(dev_addr, 6);
+    slice_t val = new_slice(&trickle_val, 1);
+    trickle_value_write(trickle_config.get_instance_fp(key), key, val, MAYFLY_CALL_ID_0);
+}
+
+void
+toggle_run() {
 #define PERIOD_MS 1000
     uint32_t err = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO // instance
         , MAYFLY_CALL_ID_PROGRAM // user
@@ -205,33 +214,22 @@ int main(void)
         , TICKER_REMAINDER(PERIOD_MS * 1000) // remainder
         , 0 // lazy
         , 0 // slot
-        , app_timeout // timeout callback function
-        , 0 // context
-        , 0 // op func
-        , 0 // op context
-        );
+        , toggle_timeout // timeout callback function
+        , 0, 0, 0);
     ASSERT(!err);
-#endif
 
     while (1) { 
         uint16_t handle = 0;
         struct radio_pdu_node_rx *node_rx = 0;
-
-        toggle_line(14);
-
         uint8_t num_complete = radio_rx_get(&node_rx, &handle);
 
         if (node_rx) {
             radio_rx_dequeue();
             // Handle PDU
             trickle_pdu_handle(&node_rx->pdu_data[9], node_rx->pdu_data[1] - 6);
-
-            toggle_line(13);
-            //
             node_rx->hdr.onion.next = 0;
             radio_rx_mem_release(&node_rx);
         }
-
         if (NRF_RADIO->STATE == 3 || NRF_RADIO->STATE == 2 || NRF_RADIO->STATE == 1) {
             NRF_GPIO->OUTSET = (1 << 2);
         } else {
@@ -240,15 +238,39 @@ int main(void)
     }
 }
 
-
 void
-app_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context) {
-    trickle_val = !trickle_val;
-    slice_t key = new_slice(dev_addr, 6);
-    slice_t val = new_slice(&trickle_val, 1);
-    trickle_value_write(trickle_config.get_instance_fp(key), key, val, MAYFLY_CALL_ID_0);
-}
+positioning_run() {
+    // Start by sending out meaningless data - distance from self to self
+    uint8_t key_data[12];
+    memcpy(key_data  , dev_addr, 6);
+    memcpy(key_data+6, dev_addr, 6);
+    slice_t key = new_slice(key_data, 12);
 
+    uint8_t val_data = 0;
+    slice_t val = new_slice(&val_data, 1);
+    trickle_value_write(trickle_config.get_instance_fp(key), key, val, MAYFLY_CALL_ID_0);
+
+    // Listen for packets
+    // (TODO) Discard meaningless packets (self <-> self)
+    while (1) { 
+        uint16_t handle = 0;
+        struct radio_pdu_node_rx *node_rx = 0;
+        uint8_t num_complete = radio_rx_get(&node_rx, &handle);
+
+        if (node_rx) {
+            radio_rx_dequeue();
+            // Handle PDU
+            trickle_pdu_handle(&node_rx->pdu_data[9], node_rx->pdu_data[1] - 6);
+            node_rx->hdr.onion.next = 0;
+            radio_rx_mem_release(&node_rx);
+        }
+        if (NRF_RADIO->STATE == 3 || NRF_RADIO->STATE == 2 || NRF_RADIO->STATE == 1) {
+            NRF_GPIO->OUTSET = (1 << 2);
+        } else {
+            NRF_GPIO->OUTCLR = (1 << 2);
+        }
+    }
+}
 
 void
 read_address() {

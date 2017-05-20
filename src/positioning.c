@@ -1,6 +1,8 @@
 #include "trickle.h"
 #include <string.h>
 
+#include "debug.h"
+
 // Structures, helper functions and interface for trickle
 
 static uint8_t values[N_TRICKLE_NODES][N_TRICKLE_NODES];
@@ -16,6 +18,7 @@ typedef struct {
 static address_index_t addresses[N_TRICKLE_NODES];
 static uint16_t addresses_top = 0;
 
+extern uint8_t dev_addr[6];
 
 void
 positioning_init() {
@@ -72,10 +75,20 @@ slice_t
 positioning_get_val(uint8_t *instance) {
     uint16_t i, j;
     get_double_index(instance, &i, &j);
+    ASSERT(i < N_TRICKLE_NODES);
+    ASSERT(j < N_TRICKLE_NODES);
     return new_slice(&values[i][j], 1);
 }
 struct trickle_t*
 positioning_get_instance(slice_t key) {
+    if (key.len != 12) {
+        return 0;
+    }
+    // Prohibit access to instances that reflect distance between same device
+    // ... except self <-> self. It's used just for other nodes to get RSSI
+    if (memcmp(key.ptr, key.ptr+6, 6) == 0 && memcmp(key.ptr, dev_addr, 6) != 0) {
+        return 0;
+    }
     uint32_t i = get_index(new_slice(key.ptr,     6));
     uint32_t j = get_index(new_slice(key.ptr + 6, 6));
     return (struct trickle_t *) &instances[i][j];
