@@ -286,9 +286,13 @@ transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, vo
     start_hfclk();
     configure_radio(tx_packet, 37, ADV_CH37);
 
-    NRF_GPIO->OUTSET = (1 << 1);
-    transmit(tx_packet, ADV_CH37);
-    NRF_GPIO->OUTCLR = (1 << 1);
+    if(trickle->c_count < trickle_config.c_threshold){
+        NRF_GPIO->OUTSET = (1 << 1);
+        transmit(tx_packet, ADV_CH37);
+        NRF_GPIO->OUTCLR = (1 << 1);        
+    }
+    // Set c counter to 0. 
+    trickle->c_count = 0;
 
     // The timer has done its job...
     ticker_stop(RADIO_TICKER_INSTANCE_ID_RADIO // instance
@@ -401,6 +405,7 @@ trickle_value_write(trickle_t *instance, slice_t key, slice_t val, uint8_t user_
 
     printf("Internal (key: "); print_slice(key); printf(", val: "); print_slice(val); printf(")\n");
     value_register(instance, key, val, instance->version + 1, user_id);
+    printf("Version: %d!\n", instance->version);
 }
 
 
