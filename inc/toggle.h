@@ -1,10 +1,10 @@
-#ifndef POSITIONING_H
-#define POSITIONING_H
+#ifndef TOGGLE_H
+#define TOGGLE_H
 
 #include "trickle.h"
 
 void
-toggle_app_init();
+toggle_init();
 
 uint8_t
 toggle_get_key(uint8_t *instance, uint8_t *dest);

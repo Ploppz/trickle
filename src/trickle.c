@@ -1,6 +1,6 @@
-#include "nrf.h"
-
 #include <string.h>
+#include "nrf.h"
+#include "SEGGER_RTT.h"
 // Trickle
 #include "trickle.h"
 #include "tx.h"
@@ -23,7 +23,7 @@
 
 // TODO .. not a good solution
 
-extern uint8_t *dev_addr;
+extern uint8_t dev_addr[6];
 extern address_type_t addr_type;
 
 
@@ -59,18 +59,27 @@ toggle_line(uint32_t line);
 uint32_t
 rand_range(uint32_t min, uint32_t max);
 
-// TODO .. in lack of a better more endianness-agnostic way to read/write uint32_t in byte streams
 uint32_t
-read_quad(uint8_t *bytes) {
+read_uint32(uint8_t *bytes) {
     return (bytes[3]<<24) | (bytes[2]<<16) | (bytes[1]<<8) | (bytes[0]);
 }
 void
-write_quad(uint8_t *dest, uint32_t quad) {
+write_uint32(uint8_t *dest, uint32_t src) {
     uint32_t low_mask = (1<<9) - 1;
-    dest[0] = (quad    ) & low_mask;
-    dest[1] = (quad>> 8) & low_mask;
-    dest[2] = (quad>>16) & low_mask;
-    dest[3] = (quad>>24) & low_mask;
+    dest[0] = (src    ) & low_mask;
+    dest[1] = (src>> 8) & low_mask;
+    dest[2] = (src>>16) & low_mask;
+    dest[3] = (src>>24) & low_mask;
+}
+uint16_t
+read_uint16(uint8_t *bytes) {
+    return (bytes[1]<<8) | (bytes[0]);
+}
+void
+write_uint16(uint8_t *dest, uint16_t src) {
+    uint32_t low_mask = (1<<9) - 1;
+    dest[0] = (src    ) & low_mask;
+    dest[1] = (src>> 8) & low_mask;
 }
 
 #define TRANSMISSION_PREPARE_TIME_US 500
@@ -111,11 +120,13 @@ trickle_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, voi
             0, 0, // slot
             0, 1, // lazy, force
             0, 0);
+
+    // TODO: Following is a major problem
     ASSERT(err != TICKER_STATUS_FAILURE);
 
     request_transmission(trickle);
 
-    //radio_disable();
+    // radio_disable();
 }
 
 
@@ -244,17 +255,13 @@ transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, vo
     // |----------+---------|
 
     uint8_t *packet_ptr = tx_packet;
-    packet_ptr += PDU_HDR_LEN;
+    packet_ptr += PDU_HDR_LEN + DEV_ADDR_LEN;
 
     uint8_t *packet_start_ptr = packet_ptr;
 
-    // Protocol discriminator
-    write_quad(packet_ptr, PROTOCOL_ID);
-    packet_ptr += sizeof(uint32_t);
-
     // Version
-    write_quad(packet_ptr, trickle->version);
-    packet_ptr += sizeof(uint32_t);
+    write_uint32(packet_ptr, trickle->version);
+    packet_ptr += sizeof(trickle->version);
 
     // Key
     uint8_t key_len = trickle_config.get_key_fp((uint8_t*)trickle, &packet_ptr[1]);
@@ -268,11 +275,13 @@ transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, vo
     packet_ptr += 1 + val.len;
     
     write_pdu_header(PDU_TYPE_ADV_IND, packet_ptr - packet_start_ptr, addr_type, dev_addr, tx_packet);
-
     // Transmission
     start_hfclk();
     configure_radio(tx_packet, 37, ADV_CH37);
+
+    NRF_GPIO->OUTSET = (1 << 1);
     transmit(tx_packet, ADV_CH37);
+    NRF_GPIO->OUTCLR = (1 << 1);
 
     // The timer has done its job...
     ticker_stop(RADIO_TICKER_INSTANCE_ID_RADIO // instance
@@ -305,10 +314,20 @@ start_instance(trickle_t *instance, uint8_t user_id) {
         );
     ASSERT(err != TICKER_STATUS_FAILURE);
 }
+
+void
+print_slice(slice_t slice) {
+    for (int i = 0; i < slice.len-1; i ++) {
+        printf("%x,", slice.ptr[i]);
+    }
+    printf("%x", slice.ptr[slice.len-1]);
+}
+
 void
 value_register(trickle_t *instance, slice_t key, slice_t new_val, trickle_version_t version, uint32_t user_id) {
     // If local version is 0, it means the instance is unused and should be initialised
     if (instance->version == 0) {
+        printf(" == Start instance (ticker_id: %d, key: ", instance->ticker_id); print_slice(key); printf(")\n");
         start_instance(instance, user_id);
     }
 
@@ -336,13 +355,7 @@ void
 trickle_pdu_handle(uint8_t *packet_ptr, uint8_t packet_len) {
     uint8_t *packet_end_ptr = packet_ptr + packet_len; // in order to check later that the packet length is correct
 
-    uint32_t protocol_id = read_quad(packet_ptr);
-    if (protocol_id != PROTOCOL_ID) {
-        return;
-    }
-    packet_ptr += sizeof(protocol_id);
-
-    uint32_t version = read_quad(packet_ptr);
+    uint32_t version = read_uint32(packet_ptr);
     packet_ptr += sizeof(version);
 
     uint8_t key_len = packet_ptr[0];
@@ -356,22 +369,33 @@ trickle_pdu_handle(uint8_t *packet_ptr, uint8_t packet_len) {
     slice_t val = new_slice(packet_ptr, val_len);
     packet_ptr += val_len;
 
+    uint8_t rssi1 = *packet_end_ptr;
+    uint8_t rssi2 = *(packet_end_ptr-1);
+
     // Check that we have read exactly until packet_len
     if (packet_ptr != packet_end_ptr) {
         return;
     }
 
     trickle_t *instance = trickle_config.get_instance_fp(key);
-
-    value_register(instance, key, val, version, MAYFLY_CALL_ID_PROGRAM);
+    if (instance) {
+        if (version > instance->version) {
+            printf("External (key: "); print_slice(key); printf(", val: "); print_slice(val); printf(")\n");
+        }
+        value_register(instance, key, val, version, MAYFLY_CALL_ID_PROGRAM);
+    }
 }
+
 void
 trickle_value_write(trickle_t *instance, slice_t key, slice_t val, uint8_t user_id) {
-    uint32_t v = instance->version;
-    value_register(instance, key, val, instance->version + 1, user_id);
+    printf("Internal (key: "); print_slice(key); printf(", val: "); print_slice(val); printf(")\n");
+
+    slice_t old_val = trickle_config.get_val_fp((uint8_t *)instance);
+    if (memcmp(val.ptr, old_val.ptr, val.len) || instance->version == 0) {
+        // Only register value if it's not equal to the old value, ||  if it's the first value
+        value_register(instance, key, val, instance->version + 1, user_id);
+    }
 }
-
-
 
 uint32_t
 get_t_value(trickle_t *trickle){

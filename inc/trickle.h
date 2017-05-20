@@ -16,16 +16,25 @@ struct trickle_t;
 #define TICKER_PER_TRICKLE 3 // Instances of ticker per instance of trickle
 
 
-// id of a trickle instance
 typedef uint32_t trickle_version_t;
+typedef uint16_t trickle_app_id_t;
 
 
 // get_key:
-typedef uint8_t            (*trickle_get_key_fp_t)     (uint8_t *instance, uint8_t *dest);
+typedef uint8_t             (*trickle_get_key_fp_t)     (uint8_t *instance, uint8_t *dest);
 // get_data: If data is not present, register it...
-typedef slice_t            (*trickle_get_val_fp_t)    (uint8_t *instance);
+typedef slice_t             (*trickle_get_val_fp_t)     (uint8_t *instance);
 // get_instance: If key is not found, this function should initialize a trickle struct
-typedef struct trickle_t*  (*trickle_get_instance_fp_t) (slice_t key);
+typedef struct trickle_t *  (*trickle_get_instance_fp_t)(slice_t key);
+
+
+// unused atm.
+typedef struct __attribute__((packed)) {
+    uint32_t version;
+    uint8_t  key_len;
+    uint8_t  val_len;
+    uint8_t  data[1];
+} trickle_pdu_t;
 
 typedef struct {
     // Trickle config
@@ -64,5 +73,17 @@ rand(int min, int max);
 
 uint32_t
 get_t_value(struct trickle_t *trickle);
+
+
+// Serializing
+
+uint32_t
+read_uint32(uint8_t *src);
+void
+write_uint32(uint8_t *dest, uint32_t src);
+uint16_t
+read_uint16(uint8_t *src);
+void
+write_uint16(uint8_t *dest, uint16_t src);
 
 #endif

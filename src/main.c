@@ -1,10 +1,11 @@
 #include "trickle.h"
 #include "tx.h"
 #include "slice.h"
-#include "toggle.h"
-#include "positioning.h"
 #include "outbox.h"
+#include "positioning.h"
+#include "toggle.h"
 
+#include "SEGGER_RTT.h"
 
 #include "soc.h"
 #include "cpu.h"
@@ -35,22 +36,24 @@ uint8_t __noinit main_stack[2048];
 void * const isr_stack_top = isr_stack + sizeof(isr_stack);
 void * const main_stack_top = main_stack + sizeof(main_stack);
 
-#define TICKER_NODES (RADIO_TICKER_NODES + 1 + TICKER_PER_TRICKLE * N_TRICKLE_INSTANCES + 20)
+#define TICKER_NODES (RADIO_TICKER_NODES + 1 + TICKER_PER_TRICKLE * N_TRICKLE_INSTANCES)
 
-#define TICKER_USER_WORKER_OPS (RADIO_TICKER_USER_WORKER_OPS)
-#define TICKER_USER_JOB_OPS (RADIO_TICKER_USER_JOB_OPS)
-#define TICKER_USER_APP_OPS (RADIO_TICKER_USER_APP_OPS)
+#define TICKER_USER_WORKER_OPS (RADIO_TICKER_USER_WORKER_OPS + 10)
+#define TICKER_USER_JOB_OPS (RADIO_TICKER_USER_JOB_OPS + 10)
+#define TICKER_USER_APP_OPS (RADIO_TICKER_USER_APP_OPS + 10)
 #define TICKER_USER_OPS (TICKER_USER_WORKER_OPS + TICKER_USER_JOB_OPS + TICKER_USER_APP_OPS)
 
 static uint8_t ALIGNED(4) ticker_nodes[TICKER_NODES][TICKER_NODE_T_SIZE];
 static uint8_t ALIGNED(4) ticker_users[MAYFLY_CALLER_COUNT][TICKER_USER_T_SIZE];
 static uint8_t ALIGNED(4) ticker_user_ops[TICKER_USER_OPS][TICKER_USER_OP_T_SIZE];
+
+
 static uint8_t ALIGNED(4) rng[3 + 4 + 1];
 static uint8_t ALIGNED(4) radio[RADIO_MEM_MNG_SIZE];
 
 
-#define SCAN_INTERVAL      0x0100 // 160 ms
-#define SCAN_WINDOW        0x0050 // 50 ms
+#define SCAN_INTERVAL      0x0010 // 10 ms
+#define SCAN_WINDOW        0x000e // 8.75 ms
 #define SCAN_FILTER_POLICY 0
 
 #define TICKER_ID_APP (RADIO_TICKER_NODES)
@@ -61,6 +64,11 @@ static uint8_t ALIGNED(4) radio[RADIO_MEM_MNG_SIZE];
 // Config //
 ////////////
 
+// Macro to construct {APP_NAME}_{FN_NAME}
+#define CAT(x, y) CAT_(x, y)
+#define CAT_(x, y) x ## y
+#define APP_FN(FN_NAME) CAT(CAT(APP_NAME, _), FN_NAME)
+
 trickle_config_t trickle_config = {
     .interval_min_us = 1000,
     .interval_max_us = 1000000,
@@ -68,9 +76,9 @@ trickle_config_t trickle_config = {
     
     .first_ticker_id =  TICKER_ID_TRICKLE,
 
-    .get_key_fp = &toggle_get_key,
-    .get_val_fp = &toggle_get_val,
-    .get_instance_fp = &toggle_get_instance,
+    .get_key_fp = &APP_FN(get_key),
+    .get_val_fp = &APP_FN(get_val),
+    .get_instance_fp = &APP_FN(get_instance),
 };
 
 
@@ -97,25 +105,30 @@ void gpiote_out_init(uint32_t index, uint32_t pin, uint32_t polarity, uint32_t i
 void init_ppi();
 uint32_t low_mask(uint8_t n);
 uint32_t rand_range(uint32_t min, uint32_t max);
-void app_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context);
 void read_address();
+
+// Applications
+void toggle_run();
+void positioning_run();
 
 static uint8_t trickle_val = 0;
 
-int8_t dev_addr[6];
+uint8_t dev_addr[6];
 address_type_t addr_type;
 
 int main(void)
 {
     uint32_t retval;
-
     DEBUG_INIT();
 
-    // pins 10-12, 16-24
-    uint32_t out_pins = 0b111111111000111 << 10;
+    // pins 1-4, 10-12, 16-24
+    //                    31     24      16      8       0
+    //                    |------||------||------||------|
+    uint32_t out_pins = 0b00000001111111110001110000011110;
     NRF_GPIO->DIRSET = out_pins;
     NRF_GPIO->OUTSET = out_pins;
 
+    NRF_GPIO->OUTCLR = (1 << 1);
     NRF_GPIO->DIRSET = (1 << 15);
     NRF_GPIO->OUTSET = (1 << 15);
 
@@ -181,7 +194,7 @@ int main(void)
     ticker_init(RADIO_TICKER_INSTANCE_ID_RADIO,
             TICKER_NODES, &ticker_nodes[0],
             MAYFLY_CALLER_COUNT, &ticker_users[0],
-            RADIO_TICKER_USER_OPS, &ticker_user_ops[0]);
+            TICKER_USER_OPS, &ticker_user_ops[0]);
 
     rand_init(rng, sizeof(rng));
     irq_priority_set(RNG_IRQn, 0xFF);
@@ -208,17 +221,28 @@ int main(void)
     ll_address_set(addr_type, dev_addr);
     ll_scan_data_set(sizeof(scn_data), scn_data);
 
-    // TODO passive (0)
-#if 0
-    ll_scan_params_set(1, SCAN_INTERVAL, SCAN_WINDOW, addr_type, SCAN_FILTER_POLICY);
+    ll_scan_params_set(0, SCAN_INTERVAL, SCAN_WINDOW, addr_type, SCAN_FILTER_POLICY);
     retval = ll_scan_enable(1);
     ASSERT(!retval);
-#endif
 
+    APP_FN(init)();
+    APP_FN(run)();
+}
 
-    toggle_app_init();
+////////////////
+// App toggle //
+////////////////
 
-#if 1
+void
+toggle_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context) {
+    trickle_val = !trickle_val;
+    slice_t key = new_slice(dev_addr, 6);
+    slice_t val = new_slice(&trickle_val, 1);
+    trickle_value_write(trickle_config.get_instance_fp(key), key, val, MAYFLY_CALL_ID_0);
+}
+
+void
+toggle_run() {
 #define PERIOD_MS 1000
     uint32_t err = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO // instance
         , MAYFLY_CALL_ID_PROGRAM // user
@@ -229,44 +253,66 @@ int main(void)
         , TICKER_REMAINDER(PERIOD_MS * 1000) // remainder
         , 0 // lazy
         , 0 // slot
-        , app_timeout // timeout callback function
-        , 0 // context
-        , 0 // op func
-        , 0 // op context
-        );
+        , toggle_timeout // timeout callback function
+        , 0, 0, 0);
     ASSERT(!err);
-#endif
 
     while (1) { 
         uint16_t handle = 0;
         struct radio_pdu_node_rx *node_rx = 0;
-
-        toggle_line(14);
-
         uint8_t num_complete = radio_rx_get(&node_rx, &handle);
 
         if (node_rx) {
             radio_rx_dequeue();
             // Handle PDU
             trickle_pdu_handle(&node_rx->pdu_data[9], node_rx->pdu_data[1] - 6);
-
-            toggle_line(13);
-            //
             node_rx->hdr.onion.next = 0;
             radio_rx_mem_release(&node_rx);
+        }
+        if (NRF_RADIO->STATE == 3 || NRF_RADIO->STATE == 2 || NRF_RADIO->STATE == 1) {
+            NRF_GPIO->OUTSET = (1 << 2);
+        } else {
+            NRF_GPIO->OUTCLR = (1 << 2);
         }
     }
 }
 
 
-void
-app_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context) {
-    trickle_val = !trickle_val;
-    slice_t key = new_slice(dev_addr, 6);
-    slice_t val = new_slice(&trickle_val, 1);
-    trickle_value_write(toggle_get_instance(key), key, val, MAYFLY_CALL_ID_0);
-}
+/////////////////////
+// App positioning //
+/////////////////////
 
+void
+positioning_run() {
+    // Listen for packets
+    // Discard meaningless packets (self <-> self)
+    while (1) { 
+        uint16_t handle = 0;
+        struct radio_pdu_node_rx *node_rx = 0;
+        uint8_t num_complete = radio_rx_get(&node_rx, &handle);
+
+        if (node_rx) {
+            radio_rx_dequeue();
+            uint32_t pdu_len = node_rx->pdu_data[1];
+            
+            trickle_pdu_handle(&node_rx->pdu_data[PDU_HDR_LEN + DEV_ADDR_LEN], pdu_len - 6);
+
+            if (is_positioning_node(&node_rx->pdu_data[PDU_HDR_LEN])) {
+                uint8_t rssi = node_rx->pdu_data[pdu_len + PDU_HDR_LEN];
+                positioning_register_rssi(rssi, &node_rx->pdu_data[PDU_HDR_LEN]);
+            }
+
+            node_rx->hdr.onion.next = 0;
+            radio_rx_mem_release(&node_rx);
+        }
+
+        if (NRF_RADIO->STATE == 3 || NRF_RADIO->STATE == 2 || NRF_RADIO->STATE == 1) {
+            NRF_GPIO->OUTSET = (1 << 2);
+        } else {
+            NRF_GPIO->OUTCLR = (1 << 2);
+        }
+    }
+}
 
 void
 read_address() {

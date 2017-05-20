@@ -51,7 +51,7 @@ get_instance_index(uint8_t *instance) {
 // Interface //
 ///////////////
 void
-toggle_app_init() {
+toggle_init() {
     trickle_init((struct trickle_t*)instances, N_TRICKLE_NODES);
 }
 

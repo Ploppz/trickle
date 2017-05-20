@@ -19,7 +19,8 @@ typedef enum {
 #define ADV_CH39 39
 
 // The length before payload
-#define PDU_HDR_LEN 9
+#define PDU_HDR_LEN 3
+#define DEV_ADDR_LEN 6
 
 // (probably not needed in this project, as it's done by PhoenixLL
 void configure_radio(uint8_t* packet_ptr, uint8_t bt_channel, uint8_t rf_channel);
