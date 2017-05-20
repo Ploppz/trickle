@@ -47,7 +47,6 @@ static uint8_t ALIGNED(4) ticker_user_ops[TICKER_USER_OPS][TICKER_USER_OP_T_SIZE
 static uint8_t ALIGNED(4) rng[3 + 4 + 1];
 static uint8_t ALIGNED(4) radio[RADIO_MEM_MNG_SIZE];
 
-#define MEMSIZE  sizeof(ticker_nodes) + sizeof(ticker_users) + sizeof(ticker_user_ops) + sizeof(radio)
 
 #define SCAN_INTERVAL      0x0010 // 160 ms
 #define SCAN_WINDOW        0x000e // 50 ms
@@ -106,7 +105,6 @@ address_type_t addr_type;
 
 int main(void)
 {
-    uint32_t a = MEMSIZE;
     uint32_t retval;
     printf("Hello World %d!\n", 42);
 
