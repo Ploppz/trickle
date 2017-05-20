@@ -2,6 +2,7 @@
 #include "tx.h"
 #include "slice.h"
 #include "positioning.h"
+#include "toggle.h"
 
 #include "SEGGER_RTT.h"
 
@@ -36,9 +37,9 @@ void * const main_stack_top = main_stack + sizeof(main_stack);
 
 #define TICKER_NODES (RADIO_TICKER_NODES + 1 + TICKER_PER_TRICKLE * N_TRICKLE_INSTANCES)
 
-#define TICKER_USER_WORKER_OPS (RADIO_TICKER_USER_WORKER_OPS + 7)
-#define TICKER_USER_JOB_OPS (RADIO_TICKER_USER_JOB_OPS + 7)
-#define TICKER_USER_APP_OPS (RADIO_TICKER_USER_APP_OPS + 7)
+#define TICKER_USER_WORKER_OPS (RADIO_TICKER_USER_WORKER_OPS + 10)
+#define TICKER_USER_JOB_OPS (RADIO_TICKER_USER_JOB_OPS + 10)
+#define TICKER_USER_APP_OPS (RADIO_TICKER_USER_APP_OPS + 10)
 #define TICKER_USER_OPS (TICKER_USER_WORKER_OPS + TICKER_USER_JOB_OPS + TICKER_USER_APP_OPS)
 
 static uint8_t ALIGNED(4) ticker_nodes[TICKER_NODES][TICKER_NODE_T_SIZE];

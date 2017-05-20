@@ -307,11 +307,20 @@ start_instance(trickle_t *instance, uint8_t user_id) {
         );
     ASSERT(err != TICKER_STATUS_FAILURE);
 }
+
+void
+print_slice(slice_t slice) {
+    for (int i = 0; i < slice.len-1; i ++) {
+        printf("%x,", slice.ptr[i]);
+    }
+    printf("%x", slice.ptr[slice.len-1]);
+}
+
 void
 value_register(trickle_t *instance, slice_t key, slice_t new_val, trickle_version_t version, uint32_t user_id) {
     // If local version is 0, it means the instance is unused and should be initialised
     if (instance->version == 0) {
-        printf(" == Start instance (key: %x,%x,%x,%x,%x,%x)\n", key.ptr[0], key.ptr[1], key.ptr[2], key.ptr[3], key.ptr[4], key.ptr[5]);
+        printf(" == Start instance (key: "); print_slice(key); printf(")\n");
         start_instance(instance, user_id);
     }
 
@@ -368,7 +377,7 @@ trickle_pdu_handle(uint8_t *packet_ptr, uint8_t packet_len) {
     trickle_t *instance = trickle_config.get_instance_fp(key);
 
     if (version > instance->version) {
-        printf("External (key: %x,%x,%x,%x,%x,%x, val: %x)\n", key.ptr[0], key.ptr[1], key.ptr[2], key.ptr[3], key.ptr[4], key.ptr[5], val.ptr[0]);
+        printf("External (key: "); print_slice(key); printf(", val: "); print_slice(val); printf(")\n");
     }
     value_register(instance, key, val, version, MAYFLY_CALL_ID_PROGRAM);
 }
@@ -376,7 +385,7 @@ void
 trickle_value_write(trickle_t *instance, slice_t key, slice_t val, uint8_t user_id) {
     uint32_t v = instance->version;
 
-    printf("Internal (key: %x,%x,%x,%x,%x,%x, val: %x)\n", key.ptr[0], key.ptr[1], key.ptr[2], key.ptr[3], key.ptr[4], key.ptr[5], val.ptr[0]);
+    printf("Internal (key: "); print_slice(key); printf(", val: "); print_slice(val); printf(")\n");
     value_register(instance, key, val, instance->version + 1, user_id);
 }
 
