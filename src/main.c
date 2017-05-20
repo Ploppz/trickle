@@ -195,7 +195,7 @@ int main(void)
     APP_FN(init)();
 
 #if 1
-#define PERIOD_MS 1000
+#define PERIOD_MS 10000
     uint32_t err = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO // instance
         , MAYFLY_CALL_ID_PROGRAM // user
         , TICKER_ID_APP // ticker id

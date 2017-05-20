@@ -104,13 +104,27 @@ trickle_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, voi
     toggle_line(21);
     // Set the next interval
     trickle_next_interval(trickle);
-    uint32_t err = ticker_update(RADIO_TICKER_INSTANCE_ID_RADIO, // instance
-            MAYFLY_CALL_ID_0, // user
-            trickle->ticker_id, // ticker_id
-            TICKER_US_TO_TICKS(trickle->interval - trickle_config.interval_min_us), 0,
-            0, 0, // slot
-            0, 1, // lazy, force
-            0, 0);
+
+    ticker_stop(RADIO_TICKER_INSTANCE_ID_RADIO // instance
+            , MAYFLY_CALL_ID_0 // user
+            , trickle->ticker_id // id
+            , 0, 0); // operation fp & context
+
+    uint32_t err = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO // instance
+        , MAYFLY_CALL_ID_0 // user
+        , trickle->ticker_id // ticker id
+        , ticker_ticks_now_get() // anchor point
+        , TICKER_US_TO_TICKS(trickle->interval) // first interval
+        , TICKER_US_TO_TICKS(trickle->interval) // periodic interval
+        , TICKER_REMAINDER(trickle->interval) // remainder
+        , 0 // lazy
+        , 0 // slot
+        , trickle_timeout // timeout callback function
+        , trickle // context
+        , 0 // op func
+        , 0 // op context
+        );
+
     ASSERT(err != TICKER_STATUS_FAILURE);
 
     request_transmission(trickle);
