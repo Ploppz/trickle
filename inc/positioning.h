@@ -14,4 +14,7 @@ positioning_get_val(uint8_t *instance);
 struct trickle_t*
 positioning_get_instance(slice_t key);
 
+void
+positioning_register_rssi(uint8_t rssi, uint8_t *other_dev_addr);
+
 #endif

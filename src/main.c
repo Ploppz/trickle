@@ -193,6 +193,9 @@ int main(void)
     APP_FN(run)();
 }
 
+////////////////
+// App toggle //
+////////////////
 
 void
 toggle_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context) {
@@ -238,20 +241,15 @@ toggle_run() {
     }
 }
 
+
+/////////////////////
+// App positioning //
+/////////////////////
+
 void
 positioning_run() {
-    // Start by sending out meaningless data - distance from self to self
-    uint8_t key_data[12];
-    memcpy(key_data  , dev_addr, 6);
-    memcpy(key_data+6, dev_addr, 6);
-    slice_t key = new_slice(key_data, 12);
-
-    uint8_t val_data = 0;
-    slice_t val = new_slice(&val_data, 1);
-    trickle_value_write(trickle_config.get_instance_fp(key), key, val, MAYFLY_CALL_ID_0);
-
     // Listen for packets
-    // (TODO) Discard meaningless packets (self <-> self)
+    // Discard meaningless packets (self <-> self)
     while (1) { 
         uint16_t handle = 0;
         struct radio_pdu_node_rx *node_rx = 0;
@@ -259,11 +257,17 @@ positioning_run() {
 
         if (node_rx) {
             radio_rx_dequeue();
-            // Handle PDU
-            trickle_pdu_handle(&node_rx->pdu_data[9], node_rx->pdu_data[1] - 6);
+            uint32_t pdu_len = node_rx->pdu_data[1];
+            
+            trickle_pdu_handle(&node_rx->pdu_data[PDU_HDR_LEN + DEV_ADDR_LEN], pdu_len - 6);
+
+            uint8_t rssi = node_rx->pdu_data[pdu_len + PDU_HDR_LEN];
+            positioning_register_rssi(rssi, &node_rx->pdu_data[PDU_HDR_LEN]);
+
             node_rx->hdr.onion.next = 0;
             radio_rx_mem_release(&node_rx);
         }
+
         if (NRF_RADIO->STATE == 3 || NRF_RADIO->STATE == 2 || NRF_RADIO->STATE == 1) {
             NRF_GPIO->OUTSET = (1 << 2);
         } else {
