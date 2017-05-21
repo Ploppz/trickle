@@ -185,42 +185,32 @@ int main(void)
     irq_priority_set(RADIO_IRQn, CONFIG_BLUETOOTH_CONTROLLER_WORKER_PRIO);
 
 
-    { // Testing rio
+    { // Testing rio: copy-cat
         irq_enable(RADIO_IRQn);
         rio_init(10000);
         while (1) {
-            packet_t *packet = 0;
-            while (!packet) {
-                packet = rio_tx_start_packet();
+            // Wait for incoming packet
+            packet_t *in_packet = 0;
+            while (!in_packet) {
+                in_packet = rio_rx_get_packet();
             }
-            uint8_t *packet_ptr = packet->data;
-            packet_ptr += PDU_HDR_LEN + DEV_ADDR_LEN;
-            uint8_t *packet_start_ptr = packet_ptr;
-            *(packet_ptr++) = 0;
-            *(packet_ptr++) = 0x11;
-            *(packet_ptr++) = 0x22;
-            *(packet_ptr++) = 0x33;
-            *(packet_ptr++) = 0x44;
-            *(packet_ptr++) = 0x55;
-            *(packet_ptr++) = 0x66;
-            *(packet_ptr++) = 0x77;
-            *(packet_ptr++) = 0x88;
 
-            write_pdu_header(PDU_TYPE_ADV_IND, packet_ptr - packet_start_ptr, addr_type, dev_addr, packet->data);
-            rio_tx_finalize_packet(packet);
+            // Write new outgoing packet
+            // Just in case the buffer is full - wait for available memory
+            packet_t *out_packet = 0;
+            while (!out_packet) {
+                out_packet = rio_tx_start_packet();
+            }
+            // Copy the first 20 bytes
+            uint32_t i = PDU_HDR_LEN + DEV_ADDR_LEN;
+            for (; i<20; i ++) {
+                out_packet[i] = in_packet[i];
+            }
+
+            write_pdu_header(PDU_TYPE_ADV_IND, i - PDU_HDR_LEN - DEV_ADDR_LEN, addr_type, dev_addr, out_packet->data);
+            rio_tx_finalize_packet(out_packet);
         }
     }
-
-    // Start scanning
-    // (TODO investigate which of these lines are necessary)
-
-    uint8_t scn_data[] = {0x02, 0x01, 0x06, 0x0B, 0x08, 'P', 'h', 'o', 'e', 'n', 'i', 'x', ' ', 'L', 'L'};
-    ll_address_set(addr_type, dev_addr);
-    ll_scan_data_set(sizeof(scn_data), scn_data);
-
-    ll_scan_params_set(0, SCAN_INTERVAL, SCAN_WINDOW, addr_type, SCAN_FILTER_POLICY);
-    retval = ll_scan_enable(1);
-    ASSERT(!retval);
 
     APP_FN(init)();
     APP_FN(run)();

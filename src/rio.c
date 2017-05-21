@@ -99,7 +99,7 @@ inbox_front() {
 
 packet_t *
 inbox_back() {
-    uint32_t tail = (inbox_tail-1) % RIO_N_PACKETS;
+    uint32_t tail = (inbox_tail + RIO_N_PACKETS - 1) % RIO_N_PACKETS;
     if (inbox_head == inbox_tail) {
         return 0;
     } else {
