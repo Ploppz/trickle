@@ -11,6 +11,7 @@ typedef struct outbox_config_t outbox_config_t;
 struct packet_t {
     uint8_t data[MAX_PACKET_LEN];
     uint8_t final;
+    uint8_t in_progress;
 };
 typedef struct packet_t packet_t;
 

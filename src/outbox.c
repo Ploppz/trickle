@@ -9,8 +9,8 @@
 
 // Elements are in [head, tail)
 packet_t packets[OUTBOX_N_PACKETS];
-uint32_t head = 0;
-uint32_t tail = 0;
+uint32_t head       = 0;
+uint32_t tail       = 0;
 
 packet_t *
 push() {
@@ -22,6 +22,7 @@ push() {
         uint32_t prev_tail = tail;
         tail = next_tail;
         packets[prev_tail].final = 0;
+        packets[prev_tail].in_progress = 0;
         return &packets[prev_tail];
     }
 }
@@ -50,9 +51,15 @@ pop_front() {
 
 
 void outbox_isr_radio() {
-    pop_front();
+    NRF_RADIO->EVENTS_END = 0;
+
+    // 'Free' the packet, make the memory available
+    packet_t *packet = front();
+    if (packet) {
+        packet->in_progress = 0;
+        pop_front();
+    }
     // TODO Transmit more than one packet in the given slot
-    
 }
 
 ///////////////
@@ -62,15 +69,18 @@ void outbox_isr_radio() {
 void
 schedule() {
     packet_t *packet = front();
-    if (packet == 0) {
+    if (packet == 0 || packet->in_progress == 1) {
         return;
     }
+
+    packet->in_progress = 1;
 
     start_hfclk();
     configure_radio(packet->data, outbox_config.bt_channel, outbox_config.rf_channel);
 
     // TODO: Should do this with interrupts
-    NRF_RADIO->SHORTS   = RADIO_SHORTS_READY_START_Msk;
+    NRF_RADIO->SHORTS   = RADIO_SHORTS_READY_START_Msk
+                        | RADIO_SHORTS_END_DISABLE_Msk;
                         // | RADIO_SHORTS_END_START_Msk;
 
     NRF_RADIO->INTENCLR = ~0;

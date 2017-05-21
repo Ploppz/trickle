@@ -132,30 +132,34 @@ int main(void)
     NRF_GPIO->DIRSET = (1 << 15);
     NRF_GPIO->OUTSET = (1 << 15);
 
+    irq_enable(RADIO_IRQn);
     init_ppi();
     read_address();
 
     { // Testing outbox
-        packet_t *packet = start_packet();
-        uint8_t *packet_ptr = packet->data;
-        packet_ptr += PDU_HDR_LEN + DEV_ADDR_LEN;
-        uint8_t *packet_start_ptr = packet_ptr;
-        *(packet_ptr++) = 0;
-        *(packet_ptr++) = 0x11;
-        *(packet_ptr++) = 0x22;
-        *(packet_ptr++) = 0x33;
-        *(packet_ptr++) = 0x44;
-        *(packet_ptr++) = 0x55;
-        *(packet_ptr++) = 0x66;
-        *(packet_ptr++) = 0x77;
-        *(packet_ptr++) = 0x88;
+        for (int i = 0; i < 4; i ++) {
+            packet_t *packet = start_packet();
+            uint8_t *packet_ptr = packet->data;
+            packet_ptr += PDU_HDR_LEN + DEV_ADDR_LEN;
+            uint8_t *packet_start_ptr = packet_ptr;
+            *(packet_ptr++) = 0;
+            *(packet_ptr++) = 0x11;
+            *(packet_ptr++) = 0x22;
+            *(packet_ptr++) = 0x33;
+            *(packet_ptr++) = 0x44;
+            *(packet_ptr++) = 0x55;
+            *(packet_ptr++) = 0x66;
+            *(packet_ptr++) = 0x77;
+            *(packet_ptr++) = 0x88;
 
-        write_pdu_header(PDU_TYPE_ADV_IND, packet_ptr - packet_start_ptr, addr_type, dev_addr, packet->data);
+            write_pdu_header(PDU_TYPE_ADV_IND, packet_ptr - packet_start_ptr, addr_type, dev_addr, packet->data);
 
-        finalize_packet(packet);
-        schedule();
+            finalize_packet(packet);
+        }
 
-        while (1) {}
+        while (1) {
+            schedule();
+        }
     }
 
 
@@ -349,9 +353,9 @@ void init_ppi() {
     const uint32_t PPI_CH0 = 10;
     const uint32_t PPI_CH1 = 11;
     const uint32_t PPI_CH2 = 12;
-    gpiote_out_init(GPIO_CH0, 10, GPIOTE_CONFIG_POLARITY_Toggle, GPIOTE_CONFIG_OUTINIT_Low); // ready
-    gpiote_out_init(GPIO_CH1, 11, GPIOTE_CONFIG_POLARITY_Toggle, GPIOTE_CONFIG_OUTINIT_Low); // address
-    gpiote_out_init(GPIO_CH2, 12, GPIOTE_CONFIG_POLARITY_Toggle, GPIOTE_CONFIG_OUTINIT_Low); // end
+    gpiote_out_init(GPIO_CH0, 21, GPIOTE_CONFIG_POLARITY_Toggle, GPIOTE_CONFIG_OUTINIT_Low); // ready
+    gpiote_out_init(GPIO_CH1, 22, GPIOTE_CONFIG_POLARITY_Toggle, GPIOTE_CONFIG_OUTINIT_Low); // address
+    gpiote_out_init(GPIO_CH2, 23, GPIOTE_CONFIG_POLARITY_Toggle, GPIOTE_CONFIG_OUTINIT_Low); // end
 
     NRF_PPI->CH[PPI_CH0].EEP = (uint32_t) &(NRF_RADIO->EVENTS_READY);
     NRF_PPI->CH[PPI_CH0].TEP = (uint32_t) &(NRF_GPIOTE->TASKS_OUT[GPIO_CH0]);
