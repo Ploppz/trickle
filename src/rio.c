@@ -16,19 +16,19 @@
 
 // Elements are in [head, tail)
 
-packet_t outbox[OUTBOX_N_PACKETS];
+packet_t outbox[RIO_N_PACKETS];
 uint32_t outbox_head       = 0;
 uint32_t outbox_tail       = 0;
 
-packet_t inbox[OUTBOX_N_PACKETS];
+packet_t inbox[RIO_N_PACKETS];
 uint32_t inbox_head       = 0;
 uint32_t inbox_tail       = 0;
 
 packet_t *
 outbox_push() {
-    uint32_t next_outbox_tail = (outbox_tail+1) % OUTBOX_N_PACKETS;
+    uint32_t next_outbox_tail = (outbox_tail+1) % RIO_N_PACKETS;
     if (next_outbox_tail == outbox_head) {
-        // OVERFLOW
+        // Full buffer
         return 0;
     } else {
         uint32_t prev_outbox_tail = outbox_tail;
@@ -53,14 +53,14 @@ outbox_pop_front() {
     if (outbox_head == outbox_tail || !outbox[outbox_head].complete) {
         // EMPTY
     } else {
-        outbox_head = (outbox_head+1) % OUTBOX_N_PACKETS;
+        outbox_head = (outbox_head+1) % RIO_N_PACKETS;
     }
 }
 
 uint8_t
 outbox_len() {
     if (outbox_tail < outbox_head) {
-        return OUTBOX_N_PACKETS + outbox_tail - outbox_head;
+        return RIO_N_PACKETS + outbox_tail - outbox_head;
     } else { // outbox_head <= outbox_tail
         return outbox_tail - outbox_head;
     }
@@ -68,10 +68,10 @@ outbox_len() {
 
 packet_t *
 inbox_push() {
-    uint32_t next_inbox_tail = (inbox_tail+1) % OUTBOX_N_PACKETS;
+    uint32_t next_inbox_tail = (inbox_tail+1) % RIO_N_PACKETS;
     if (next_inbox_tail == inbox_head) {
-        // OVERFLOW - the oldest packet is forgotten
-        inbox_head = (inbox_head+1) % OUTBOX_N_PACKETS;
+        // Full buffer - the oldest packet is forgotten
+        inbox_head = (inbox_head+1) % RIO_N_PACKETS;
     }
     uint32_t prev_inbox_tail = inbox_tail;
     inbox_tail = next_inbox_tail;
@@ -99,7 +99,7 @@ inbox_front() {
 
 packet_t *
 inbox_back() {
-    uint32_t tail = (inbox_tail-1) % OUTBOX_N_PACKETS;
+    uint32_t tail = (inbox_tail-1) % RIO_N_PACKETS;
     if (inbox_head == inbox_tail) {
         return 0;
     } else {
@@ -112,7 +112,7 @@ inbox_pop_front() {
     if (inbox_head == inbox_tail || inbox[inbox_head].complete) {
         // EMPTY
     } else {
-        inbox_head = (inbox_head+1) % OUTBOX_N_PACKETS;
+        inbox_head = (inbox_head+1) % RIO_N_PACKETS;
     }
 }
 
@@ -126,7 +126,7 @@ inbox_free_garbage() {
         } else {
             break;
         }
-        i = (i+1) % OUTBOX_N_PACKETS;
+        i = (i+1) % RIO_N_PACKETS;
     }
 }
 
@@ -171,8 +171,6 @@ clear_radio_events() {
 }
 
 
-static uint32_t x = 0;
-static uint32_t y = 0;
 
 void
 rio_isr_radio() {
@@ -186,19 +184,16 @@ rio_isr_radio() {
         } else if (NRF_RADIO->EVENTS_END) {
             // Free memory of previous transmission
             
-            { // Test assumptions/logic
-                packet_t *old_packet = outbox_front();
-                ASSERT(old_packet);
-                ASSERT(old_packet->transmitting == 1);
+            packet_t *old_packet = outbox_front();
+            // The following IF should always be true but that changes when setting breakpoints
+            if (old_packet && old_packet->transmitting == 1) {
+                outbox_pop_front();
             }
-            outbox_pop_front();
         }
 
         if (NRF_RADIO->EVENTS_END || NRF_RADIO->EVENTS_READY) {
             // Initiate new transmission
-            x ++;
             if (outbox_len() > 0) {
-                y ++;
                 // Transmit again
                 packet_t *packet = outbox_front();
                 packet->transmitting = 1;
@@ -307,8 +302,7 @@ rio_init(uint32_t interval_us) {
 
 packet_t *
 rio_tx_start_packet() {
-    packet_t *ptr = outbox_push();
-    return ptr;
+    return outbox_push();
 }
 
 // Signal that the packet is done - no more writing

@@ -188,27 +188,27 @@ int main(void)
     { // Testing rio
         irq_enable(RADIO_IRQn);
         rio_init(10000);
-        for (int i = 0; i < OUTBOX_N_PACKETS; i ++) {
-            packet_t *packet = rio_tx_start_packet();
-            if (packet) {
-                uint8_t *packet_ptr = packet->data;
-                packet_ptr += PDU_HDR_LEN + DEV_ADDR_LEN;
-                uint8_t *packet_start_ptr = packet_ptr;
-                *(packet_ptr++) = 0;
-                *(packet_ptr++) = 0x11;
-                *(packet_ptr++) = 0x22;
-                *(packet_ptr++) = 0x33;
-                *(packet_ptr++) = 0x44;
-                *(packet_ptr++) = 0x55;
-                *(packet_ptr++) = 0x66;
-                *(packet_ptr++) = 0x77;
-                *(packet_ptr++) = 0x88;
-
-                write_pdu_header(PDU_TYPE_ADV_IND, packet_ptr - packet_start_ptr, addr_type, dev_addr, packet->data);
-                rio_tx_finalize_packet(packet);
+        while (1) {
+            packet_t *packet = 0;
+            while (!packet) {
+                packet = rio_tx_start_packet();
             }
+            uint8_t *packet_ptr = packet->data;
+            packet_ptr += PDU_HDR_LEN + DEV_ADDR_LEN;
+            uint8_t *packet_start_ptr = packet_ptr;
+            *(packet_ptr++) = 0;
+            *(packet_ptr++) = 0x11;
+            *(packet_ptr++) = 0x22;
+            *(packet_ptr++) = 0x33;
+            *(packet_ptr++) = 0x44;
+            *(packet_ptr++) = 0x55;
+            *(packet_ptr++) = 0x66;
+            *(packet_ptr++) = 0x77;
+            *(packet_ptr++) = 0x88;
+
+            write_pdu_header(PDU_TYPE_ADV_IND, packet_ptr - packet_start_ptr, addr_type, dev_addr, packet->data);
+            rio_tx_finalize_packet(packet);
         }
-        while (1) {}
     }
 
     // Start scanning
