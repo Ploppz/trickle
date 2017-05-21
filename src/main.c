@@ -137,28 +137,31 @@ int main(void)
     read_address();
 
     { // Testing outbox
-        for (int i = 0; i < 4; i ++) {
-            packet_t *packet = start_packet();
-            uint8_t *packet_ptr = packet->data;
-            packet_ptr += PDU_HDR_LEN + DEV_ADDR_LEN;
-            uint8_t *packet_start_ptr = packet_ptr;
-            *(packet_ptr++) = 0;
-            *(packet_ptr++) = 0x11;
-            *(packet_ptr++) = 0x22;
-            *(packet_ptr++) = 0x33;
-            *(packet_ptr++) = 0x44;
-            *(packet_ptr++) = 0x55;
-            *(packet_ptr++) = 0x66;
-            *(packet_ptr++) = 0x77;
-            *(packet_ptr++) = 0x88;
+        for (int i = 0; i < OUTBOX_N_PACKETS; i ++) {
+            packet_t *packet = outbox_start_packet();
+            if (packet) {
+                uint8_t *packet_ptr = packet->data;
+                packet_ptr += PDU_HDR_LEN + DEV_ADDR_LEN;
+                uint8_t *packet_start_ptr = packet_ptr;
+                *(packet_ptr++) = 0;
+                *(packet_ptr++) = 0x11;
+                *(packet_ptr++) = 0x22;
+                *(packet_ptr++) = 0x33;
+                *(packet_ptr++) = 0x44;
+                *(packet_ptr++) = 0x55;
+                *(packet_ptr++) = 0x66;
+                *(packet_ptr++) = 0x77;
+                *(packet_ptr++) = 0x88;
 
-            write_pdu_header(PDU_TYPE_ADV_IND, packet_ptr - packet_start_ptr, addr_type, dev_addr, packet->data);
+                write_pdu_header(PDU_TYPE_ADV_IND, packet_ptr - packet_start_ptr, addr_type, dev_addr, packet->data);
 
-            finalize_packet(packet);
+                outbox_finalize_packet(packet);
+            }
         }
+        outbox_schedule();
 
         while (1) {
-            schedule();
+            uint8_t a = outbox_n_packets();
         }
     }
 
@@ -415,7 +418,7 @@ void rng_handler(void)
 void radio_handler(void)
 {
     isr_radio(0);
-    outbox_isr_radio();
+    rio_isr_radio();
 }
 
 void mayfly_enable_cb(uint8_t caller_id, uint8_t callee_id, uint8_t enable)

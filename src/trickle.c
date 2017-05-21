@@ -160,48 +160,13 @@ reset_timers(trickle_t *trickle, uint8_t user_id) {
 
 void
 request_transmission(trickle_t *trickle) {
-    // Stop an eventual previous timer (TODO not sure if this will work)
-    ticker_stop(RADIO_TICKER_INSTANCE_ID_RADIO // instance
-            , MAYFLY_CALL_ID_0 // user
-            , trickle->ticker_id + 1 // id
-            , 0, 0); // operation fp & context
     uint32_t random_transmit_time = rand_range(trickle->interval/2, trickle->interval - TRANSMISSION_TIME_US);
     uint32_t retval = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO // instance
         , MAYFLY_CALL_ID_0 // user
         , trickle->ticker_id + 1 // ticker id
         , ticker_ticks_now_get() // anchor point
         , TICKER_US_TO_TICKS(random_transmit_time) // first interval
-        , TICKER_US_TO_TICKS(TRANSMIT_TRY_INTERVAL_US) // periodic interval
-        , TICKER_REMAINDER(TRANSMIT_TRY_INTERVAL_US) // remainder
-        , 0 // lazy
-        , TICKER_US_TO_TICKS(TRANSMISSION_PREPARE_TIME_US + TRANSMISSION_TIME_US) // slot
-        , prepare_transmit_timeout // timeout callback function
-        , trickle // context
-        , 0 // op func
-        , 0 // op context
-        );
-    // TODO there should be a decision point whether or not to send - hence perhaps no slot at this point
-}
-
-void
-prepare_transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context) {
-    trickle_t *trickle = (trickle_t *) context;
-
-    // Need to give the PhoenixLL scanner a chance to 'cleanup'
-    radio_role_disable();
-
-    // The timer has done its job... schedule transmission
-    ticker_stop(RADIO_TICKER_INSTANCE_ID_RADIO // instance
-            , MAYFLY_CALL_ID_0 // user
-            , trickle->ticker_id + 1 // id
-            , 0, 0); // operation fp & context
-
-    uint32_t retval = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO // instance
-        , MAYFLY_CALL_ID_0 // user
-        , trickle->ticker_id + 2 // ticker id
-        , ticks_at_expire // anchor point
-        , TICKER_US_TO_TICKS(TRANSMISSION_PREPARE_TIME_US) // first interval
-        , 0 // periodic interval not needed - one-shot with no slot
+        , 0 // periodic interval
         , 0 // remainder
         , 0 // lazy
         , 0 // slot
@@ -210,36 +175,17 @@ prepare_transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t 
         , 0 // op func
         , 0 // op context
         );
+    // TODO there should be a decision point whether or not to send - hence perhaps no slot at this point
 }
 
 void
 transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context) {
     toggle_line(22);
-    ASSERT(radio_role() == 0);
-    radio_reset();
-
-    //10-11-12-16
-    {
-        NRF_GPIO->OUTCLR = (1 << 10) | (1 << 11) | (1 << 12);
-        if(lazy == 0) {
-            
-        } else if (lazy == 1) {
-            NRF_GPIO->OUTSET = (1 << 10);
-        } else if (lazy == 2) {
-            NRF_GPIO->OUTSET = (1 << 11);
-        } else if (lazy == 3) {
-            NRF_GPIO->OUTSET = (1 << 10) | (1 << 11);
-        } else if (lazy == 4) {
-            NRF_GPIO->OUTSET = (1 << 12);
-        } else if (lazy == 5) {
-            NRF_GPIO->OUTSET = (1 << 10) | (1 << 12);
-        } else if (lazy == 6) {
-            NRF_GPIO->OUTSET = (1 << 11) | (1 << 12);
-        } else {
-            NRF_GPIO->OUTSET = (1 << 10) | (1 << 11) | (1 << 12);
-        }
-        NRF_GPIO->OUT ^= (1 << 16);
-    }
+    // The timer has done its job...
+    ticker_stop(RADIO_TICKER_INSTANCE_ID_RADIO // instance
+            , MAYFLY_CALL_ID_0 // user
+            , trickle->ticker_id + 1 // id
+            , 0, 0); // operation fp & context
 
     trickle_t *trickle = (trickle_t *) context;
 
@@ -253,6 +199,11 @@ transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, vo
     // | val_len  | 1       |
     // | val      | val_len |
     // |----------+---------|
+
+    packet_t *packet = outbox_start_packet();
+    if (!packet) {
+        return;
+    }
 
     uint8_t *packet_ptr = tx_packet;
     packet_ptr += PDU_HDR_LEN + DEV_ADDR_LEN;
@@ -283,11 +234,6 @@ transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, vo
     transmit(tx_packet, ADV_CH37);
     NRF_GPIO->OUTCLR = (1 << 1);
 
-    // The timer has done its job...
-    ticker_stop(RADIO_TICKER_INSTANCE_ID_RADIO // instance
-            , MAYFLY_CALL_ID_0 // user
-            , trickle->ticker_id + 1 // id
-            , 0, 0); // operation fp & context
 }
 
 
