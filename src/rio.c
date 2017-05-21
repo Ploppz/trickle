@@ -8,6 +8,8 @@
 #include "ctrl.h"
 #include "debug.h"
 
+
+
 /////////////////////
 // Circular buffer //
 /////////////////////
@@ -31,15 +33,15 @@ outbox_push() {
     } else {
         uint32_t prev_outbox_tail = outbox_tail;
         outbox_tail = next_outbox_tail;
-        outbox[prev_outbox_tail].final = 0;
-        outbox[prev_outbox_tail].in_progress = 0;
+        outbox[prev_outbox_tail].complete = 0;
+        outbox[prev_outbox_tail].transmitting = 0;
         return &outbox[prev_outbox_tail];
     }
 }
 
 packet_t *
 outbox_front() {
-    if (outbox_head == outbox_tail || !outbox[outbox_head].final) {
+    if (outbox_head == outbox_tail || !outbox[outbox_head].complete) {
         return 0;
     } else {
         return &outbox[outbox_head];
@@ -48,7 +50,7 @@ outbox_front() {
 
 void
 outbox_pop_front() {
-    if (outbox_head == outbox_tail || !outbox[outbox_head].final) {
+    if (outbox_head == outbox_tail || !outbox[outbox_head].complete) {
         // EMPTY
     } else {
         outbox_head = (outbox_head+1) % OUTBOX_N_PACKETS;
@@ -64,31 +66,31 @@ outbox_len() {
     }
 }
 
-// Inbox
-// Init ->      Push & set PACKETPTR;
-// DEVMATCH ->  Set `final`; Push & set PACKETPTR;
-//              If cannot push, stop scanning.
-
 packet_t *
 inbox_push() {
     uint32_t next_inbox_tail = (inbox_tail+1) % OUTBOX_N_PACKETS;
     if (next_inbox_tail == inbox_head) {
-        // OVERFLOW
-        return 0;
-    } else {
-        uint32_t prev_inbox_tail = inbox_tail;
-        inbox_tail = next_inbox_tail;
-        inbox[prev_inbox_tail].final = 0;
-        inbox[prev_inbox_tail].in_progress = 0;
-        return &inbox[prev_inbox_tail];
+        // OVERFLOW - the oldest packet is forgotten
+        inbox_head = (inbox_head+1) % OUTBOX_N_PACKETS;
     }
+    uint32_t prev_inbox_tail = inbox_tail;
+    inbox_tail = next_inbox_tail;
+    inbox[prev_inbox_tail].garbage = 0;
+    inbox[prev_inbox_tail].complete = 0;
+    return &inbox[prev_inbox_tail];
 }
+
+// Inbox..
+
+void
+inbox_free_garbage();
 
 packet_t *
 inbox_front() {
-    ASSERT(!inbox[inbox_head].final); // Programming error
+    inbox_free_garbage();
+    ASSERT(!inbox[inbox_head].garbage); // (just to test)
 
-    if (inbox_head == inbox_tail) {
+    if (inbox_head == inbox_tail || inbox[inbox_head].complete) {
         return 0;
     } else {
         return &inbox[inbox_head];
@@ -98,7 +100,7 @@ inbox_front() {
 packet_t *
 inbox_back() {
     uint32_t tail = (inbox_tail-1) % OUTBOX_N_PACKETS;
-    if (inbox_head == inbox_tail || !inbox[tail].final) {
+    if (inbox_head == inbox_tail) {
         return 0;
     } else {
         return &inbox[tail];
@@ -107,7 +109,7 @@ inbox_back() {
 
 void
 inbox_pop_front() {
-    if (inbox_head == inbox_tail || !inbox[inbox_head].final) {
+    if (inbox_head == inbox_tail || inbox[inbox_head].complete) {
         // EMPTY
     } else {
         inbox_head = (inbox_head+1) % OUTBOX_N_PACKETS;
@@ -115,11 +117,11 @@ inbox_pop_front() {
 }
 
 void
-inbox_free_finals() {
-    // Remove packets from beginning whose final=1, stop when reach packet with final=0.
+inbox_free_garbage() {
+    // Remove packets from beginning whose garbage=1, stop when reach packet with garbage=0.
     uint32_t i = inbox_head;
     while (i != inbox_tail) {
-        if (inbox[i].final) {
+        if (inbox[i].garbage) {
             inbox_pop_front();
         } else {
             break;
@@ -136,18 +138,15 @@ inbox_free_finals() {
 enum state_t {
     STATE_NONE,
     STATE_TX,
-    STATE_TXRU,
     STATE_RX,
-    STATE_RXRU,
 };
 typedef enum state_t state_t;
 
 static state_t state = STATE_NONE;
 
 void
-push_rx_packet() {
+rx_new_packet() {
     packet_t *packet = inbox_push();
-    packet->final = 0;
     NRF_RADIO->PACKETPTR = (uint32_t) packet->data;
 }
 
@@ -159,31 +158,50 @@ check_event(volatile uint32_t *event) {
 }
 
 void
+clear_radio_events() {
+    NRF_RADIO->EVENTS_READY = 0;   
+    NRF_RADIO->EVENTS_ADDRESS = 0; 
+    NRF_RADIO->EVENTS_PAYLOAD = 0; 
+    NRF_RADIO->EVENTS_END = 0;     
+    NRF_RADIO->EVENTS_DISABLED = 0;
+    NRF_RADIO->EVENTS_DEVMATCH = 0;
+    NRF_RADIO->EVENTS_DEVMISS = 0; 
+    NRF_RADIO->EVENTS_RSSIEND = 0; 
+    NRF_RADIO->EVENTS_BCMATCH = 0; 
+}
+
+
+static uint32_t x = 0;
+static uint32_t y = 0;
+
+void
 rio_isr_radio() {
     if (state == STATE_TX) {
-        ASSERT(NRF_RADIO->EVENTS_DISABLED || NRF_RADIO->STATE == RADIO_STATE_STATE_Tx);
-
-        if (check_event(&NRF_RADIO->EVENTS_DISABLED)) { /* DISABLED */
+        ASSERT(NRF_RADIO->STATE != RADIO_STATE_STATE_Rx
+            && NRF_RADIO->STATE != RADIO_STATE_STATE_RxIdle);
+        if (NRF_RADIO->EVENTS_DISABLED) {
 
             NRF_RADIO->TASKS_TXEN = 1;
 
-        } else if (check_event(&NRF_RADIO->EVENTS_END)) { /* END */
-
-            ASSERT(NRF_RADIO->STATE == RADIO_STATE_STATE_Tx);
-
+        } else if (NRF_RADIO->EVENTS_END) {
+            // Free memory of previous transmission
+            
             { // Test assumptions/logic
                 packet_t *old_packet = outbox_front();
                 ASSERT(old_packet);
-                ASSERT(old_packet->in_progress == 1);
+                ASSERT(old_packet->transmitting == 1);
             }
-
-            // Cleanup - free the packet
             outbox_pop_front();
+        }
 
+        if (NRF_RADIO->EVENTS_END || NRF_RADIO->EVENTS_READY) {
+            // Initiate new transmission
+            x ++;
             if (outbox_len() > 0) {
+                y ++;
                 // Transmit again
                 packet_t *packet = outbox_front();
-                packet->in_progress = 1;
+                packet->transmitting = 1;
                 NRF_RADIO->PACKETPTR = (uint32_t) packet->data;
                 NRF_RADIO->TASKS_START = 1;
             } else {
@@ -195,22 +213,29 @@ rio_isr_radio() {
     }
     else
     if (state == STATE_RX) {
-        ASSERT(NRF_RADIO->EVENTS_DISABLED || NRF_RADIO->STATE == RADIO_STATE_STATE_Rx);
+        ASSERT(NRF_RADIO->STATE != RADIO_STATE_STATE_Tx
+            && NRF_RADIO->STATE != RADIO_STATE_STATE_TxIdle);
 
-        if (check_event(&NRF_RADIO->EVENTS_DEVMATCH)) { /* DEVMATCH */
-            push_rx_packet();
+        if (NRF_RADIO->EVENTS_END) {
+
+            rx_new_packet();
+            packet_t *packet = inbox_front();
+            packet->complete = 1;
             // TODO stop scanning if buffer full
+            NRF_RADIO->TASKS_START = 1;
 
-        } else if (check_event(&NRF_RADIO->EVENTS_END)) { /* END */
+        } else if (NRF_RADIO->EVENTS_READY) {
 
             NRF_RADIO->TASKS_START = 1;
 
-        } else if (check_event(&NRF_RADIO->EVENTS_DISABLED)) { /* DISABLED */
-
+        }
+        
+        else if (NRF_RADIO->EVENTS_DISABLED) {
             NRF_RADIO->TASKS_RXEN = 1;
-
         }
     }
+
+    clear_radio_events();
 }
 
 void
@@ -228,21 +253,14 @@ rio_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *c
 }
 
 void
-rx_rampup() {
-    NRF_RADIO->TASKS_RXEN = 1;
-    state = STATE_RX;
-}
-void
 rio_schedule_tx() {
     packet_t *packet = outbox_front();
-    if (packet == 0 || packet->in_progress == 1) {
+    if (packet == 0 || packet->transmitting == 1) {
         return;
     }
 
-    packet->in_progress = 1;
+    packet->transmitting = 1;
 
-    start_hfclk();
-    configure_radio(packet->data, rio_config.bt_channel, rio_config.rf_channel);
 
     NRF_RADIO->TASKS_TXEN   = 1;
 }
@@ -253,15 +271,21 @@ rio_schedule_tx() {
 
 void 
 rio_init(uint32_t interval_us) {
-    NRF_RADIO->SHORTS   = RADIO_SHORTS_READY_START_Msk;
+    clear_radio_events();
+    NRF_RADIO->SHORTS   = 0;
     NRF_RADIO->INTENCLR = ~0;
-    NRF_RADIO->INTENSET = RADIO_INTENSET_END_Msk
-                        | RADIO_INTENSET_DEVMATCH_Msk
+    NRF_RADIO->INTENSET = RADIO_INTENSET_READY_Msk
+                        | RADIO_INTENSET_END_Msk
                         | RADIO_INTENSET_DISABLED_Msk;
 
-    push_rx_packet();
+    start_hfclk();
+    configure_radio(rio_config.bt_channel, rio_config.rf_channel);
 
-    rx_rampup();
+    rx_new_packet();
+
+    state = STATE_RX;
+    NRF_RADIO->TASKS_RXEN = 1;
+
     uint32_t retval = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO // instance
         , MAYFLY_CALL_ID_PROGRAM // user
         , 0 // ticker id
@@ -290,7 +314,7 @@ rio_tx_start_packet() {
 // Signal that the packet is done - no more writing
 void
 rio_tx_finalize_packet(packet_t *packet) {
-    packet->final = 1;
+    packet->complete = 1;
 }
 
 
@@ -301,6 +325,6 @@ rio_rx_get_packet() {
 
 void
 rio_rx_free_packet(packet_t *packet) {
-    packet->final = 1;
-    inbox_free_finals();
+    packet->garbage = 1;
+    inbox_free_garbage();
 }

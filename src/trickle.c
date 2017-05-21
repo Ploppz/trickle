@@ -227,8 +227,10 @@ transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, vo
     
     write_pdu_header(PDU_TYPE_ADV_IND, packet_ptr - packet_start_ptr, addr_type, dev_addr, tx_packet);
     // Transmission
+    /* TODO
     start_hfclk();
     configure_radio(tx_packet, 37, ADV_CH37);
+    */
 
     NRF_GPIO->OUTSET = (1 << 1);
     transmit(tx_packet, ADV_CH37);

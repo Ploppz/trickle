@@ -185,7 +185,7 @@ int main(void)
     irq_priority_set(RADIO_IRQn, CONFIG_BLUETOOTH_CONTROLLER_WORKER_PRIO);
 
 
-    { // Testing outbox
+    { // Testing rio
         irq_enable(RADIO_IRQn);
         rio_init(10000);
         for (int i = 0; i < OUTBOX_N_PACKETS; i ++) {
@@ -343,12 +343,15 @@ void init_ppi() {
     const uint32_t GPIO_CH0 = 0;
     const uint32_t GPIO_CH1 = 1;
     const uint32_t GPIO_CH2 = 2;
+    const uint32_t GPIO_CH3 = 3;
     const uint32_t PPI_CH0 = 10;
     const uint32_t PPI_CH1 = 11;
     const uint32_t PPI_CH2 = 12;
+    const uint32_t PPI_CH3 = 13;
     gpiote_out_init(GPIO_CH0, 21, GPIOTE_CONFIG_POLARITY_Toggle, GPIOTE_CONFIG_OUTINIT_Low); // ready
     gpiote_out_init(GPIO_CH1, 22, GPIOTE_CONFIG_POLARITY_Toggle, GPIOTE_CONFIG_OUTINIT_Low); // address
     gpiote_out_init(GPIO_CH2, 23, GPIOTE_CONFIG_POLARITY_Toggle, GPIOTE_CONFIG_OUTINIT_Low); // end
+    gpiote_out_init(GPIO_CH3, 24, GPIOTE_CONFIG_POLARITY_Toggle, GPIOTE_CONFIG_OUTINIT_Low); // disabled
 
     NRF_PPI->CH[PPI_CH0].EEP = (uint32_t) &(NRF_RADIO->EVENTS_READY);
     NRF_PPI->CH[PPI_CH0].TEP = (uint32_t) &(NRF_GPIOTE->TASKS_OUT[GPIO_CH0]);
@@ -359,7 +362,10 @@ void init_ppi() {
     NRF_PPI->CH[PPI_CH2].EEP = (uint32_t) &(NRF_RADIO->EVENTS_END);
     NRF_PPI->CH[PPI_CH2].TEP = (uint32_t) &(NRF_GPIOTE->TASKS_OUT[GPIO_CH2]);
 
-    NRF_PPI->CHENSET = (1 << PPI_CH0) | (1 << PPI_CH1) | (1 << PPI_CH2);
+    NRF_PPI->CH[PPI_CH3].EEP = (uint32_t) &(NRF_RADIO->EVENTS_DISABLED);
+    NRF_PPI->CH[PPI_CH3].TEP = (uint32_t) &(NRF_GPIOTE->TASKS_OUT[GPIO_CH3]);
+
+    NRF_PPI->CHENSET = (1 << PPI_CH0) | (1 << PPI_CH1) | (1 << PPI_CH2) | (1 << PPI_CH3);
 }
 
 

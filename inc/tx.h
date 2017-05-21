@@ -23,7 +23,7 @@ typedef enum {
 #define DEV_ADDR_LEN 6
 
 // (probably not needed in this project, as it's done by PhoenixLL
-void configure_radio(uint8_t* packet_ptr, uint8_t bt_channel, uint8_t rf_channel);
+void configure_radio(uint8_t bt_channel, uint8_t rf_channel);
 void start_hfclk();
 
 void

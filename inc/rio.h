@@ -1,6 +1,17 @@
 #ifndef OUTBOX_H
 #define OUTBOX_H
 
+/* Module description
+ * Scanning and transmitting with only one slot-less ticker timer.
+ * A current shortcoming is thus that it will work well with other
+ * applications that require radio sharing.
+ *
+ * Inbox for scanning and outbox for transmitting, are circular buffers.
+ *
+ * If inbox gets full, the oldest packet gets deleted.
+ * If outbox gets full, it will busy wait (?) (TODO)
+ */
+
 struct rio_config_t {
     uint8_t bt_channel;
     uint8_t rf_channel;
@@ -10,8 +21,11 @@ typedef struct rio_config_t rio_config_t;
 
 struct packet_t {
     uint8_t data[MAX_PACKET_LEN];
-    uint8_t final;
-    uint8_t in_progress;
+    uint8_t complete;
+    union {
+        uint8_t transmitting;   // TX - in progress being transmitted
+        uint8_t garbage;        // RX - done, can be disposed
+    };
 };
 typedef struct packet_t packet_t;
 
