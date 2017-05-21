@@ -5,6 +5,7 @@
 #include "trickle.h"
 #include "tx.h"
 #include "slice.h"
+#include "rio.h"
 
 
 // PhoenixxLL
@@ -180,14 +181,13 @@ request_transmission(trickle_t *trickle) {
 
 void
 transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context) {
+    trickle_t *trickle = (trickle_t *) context;
     toggle_line(22);
     // The timer has done its job...
     ticker_stop(RADIO_TICKER_INSTANCE_ID_RADIO // instance
             , MAYFLY_CALL_ID_0 // user
             , trickle->ticker_id + 1 // id
             , 0, 0); // operation fp & context
-
-    trickle_t *trickle = (trickle_t *) context;
 
     // Packet structure:
     // |----------+---------|
@@ -200,7 +200,7 @@ transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, vo
     // | val      | val_len |
     // |----------+---------|
 
-    packet_t *packet = outbox_start_packet();
+    packet_t *packet = rio_tx_start_packet();
     if (!packet) {
         return;
     }

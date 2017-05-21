@@ -17,13 +17,21 @@ typedef struct packet_t packet_t;
 
 extern rio_config_t rio_config;
 
-packet_t *
-rio_start_packet();
-
-// Signal that the packet is done - no more writing
-void
-rio_finalize_packet(packet_t *handle);
-
 void
 rio_isr_radio();
+
+void 
+rio_init(uint32_t interval_us);
+// TX
+packet_t *
+rio_tx_start_packet();
+void
+rio_tx_finalize_packet(packet_t *packet);
+
+// RX
+packet_t *
+rio_rx_get_packet();
+void
+rio_rx_free_packet(packet_t *packet);
+
 #endif

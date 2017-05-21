@@ -1,7 +1,7 @@
 #include "trickle.h"
 #include "tx.h"
 #include "slice.h"
-#include "outbox.h"
+#include "rio.h"
 #include "positioning.h"
 #include "toggle.h"
 
@@ -82,7 +82,7 @@ trickle_config_t trickle_config = {
 };
 
 
-outbox_config_t outbox_config = {
+rio_config_t rio_config = {
     .bt_channel = 37,
     .rf_channel = ADV_CH37,
 };
@@ -132,38 +132,10 @@ int main(void)
     NRF_GPIO->DIRSET = (1 << 15);
     NRF_GPIO->OUTSET = (1 << 15);
 
-    irq_enable(RADIO_IRQn);
     init_ppi();
     read_address();
 
-    { // Testing outbox
-        for (int i = 0; i < OUTBOX_N_PACKETS; i ++) {
-            packet_t *packet = outbox_start_packet();
-            if (packet) {
-                uint8_t *packet_ptr = packet->data;
-                packet_ptr += PDU_HDR_LEN + DEV_ADDR_LEN;
-                uint8_t *packet_start_ptr = packet_ptr;
-                *(packet_ptr++) = 0;
-                *(packet_ptr++) = 0x11;
-                *(packet_ptr++) = 0x22;
-                *(packet_ptr++) = 0x33;
-                *(packet_ptr++) = 0x44;
-                *(packet_ptr++) = 0x55;
-                *(packet_ptr++) = 0x66;
-                *(packet_ptr++) = 0x77;
-                *(packet_ptr++) = 0x88;
 
-                write_pdu_header(PDU_TYPE_ADV_IND, packet_ptr - packet_start_ptr, addr_type, dev_addr, packet->data);
-
-                outbox_finalize_packet(packet);
-            }
-        }
-        outbox_schedule();
-
-        while (1) {
-            uint8_t a = outbox_n_packets();
-        }
-    }
 
 
     #if UART
@@ -210,16 +182,34 @@ int main(void)
 
     irq_priority_set(ECB_IRQn, 0xFF);
 
-    retval = radio_init(7, /* 20ppm = 7 ... 250ppm = 1, 500ppm = 0 */
-                RADIO_CONNECTION_CONTEXT_MAX,
-                RADIO_PACKET_COUNT_RX_MAX,
-                RADIO_PACKET_COUNT_TX_MAX,
-                RADIO_LL_LENGTH_OCTETS_RX_MAX,
-                RADIO_PACKET_TX_DATA_SIZE,
-                &radio[0], sizeof(radio));
-    ASSERT(!retval);
-
     irq_priority_set(RADIO_IRQn, CONFIG_BLUETOOTH_CONTROLLER_WORKER_PRIO);
+
+
+    { // Testing outbox
+        irq_enable(RADIO_IRQn);
+        rio_init(10000);
+        for (int i = 0; i < OUTBOX_N_PACKETS; i ++) {
+            packet_t *packet = rio_tx_start_packet();
+            if (packet) {
+                uint8_t *packet_ptr = packet->data;
+                packet_ptr += PDU_HDR_LEN + DEV_ADDR_LEN;
+                uint8_t *packet_start_ptr = packet_ptr;
+                *(packet_ptr++) = 0;
+                *(packet_ptr++) = 0x11;
+                *(packet_ptr++) = 0x22;
+                *(packet_ptr++) = 0x33;
+                *(packet_ptr++) = 0x44;
+                *(packet_ptr++) = 0x55;
+                *(packet_ptr++) = 0x66;
+                *(packet_ptr++) = 0x77;
+                *(packet_ptr++) = 0x88;
+
+                write_pdu_header(PDU_TYPE_ADV_IND, packet_ptr - packet_start_ptr, addr_type, dev_addr, packet->data);
+                rio_tx_finalize_packet(packet);
+            }
+        }
+        while (1) {}
+    }
 
     // Start scanning
     // (TODO investigate which of these lines are necessary)

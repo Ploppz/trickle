@@ -45,7 +45,7 @@
       <file file_name="src/trickle.c" />
       <file file_name="src/tx.c" />
       <file file_name="src/toggle.c" />
-      <file file_name="src/outbox.c" />
+      <file file_name="src/rio.c" />
     </folder>
     <configuration
       Name="Debug"
