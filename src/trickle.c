@@ -113,15 +113,27 @@ trickle_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, voi
     toggle_line(21);
     // Set the next interval
     trickle_next_interval(trickle);
-    uint32_t err = ticker_update(RADIO_TICKER_INSTANCE_ID_RADIO, // instance
-            MAYFLY_CALL_ID_0, // user
-            trickle->ticker_id, // ticker_id
-            TICKER_US_TO_TICKS(trickle->interval - trickle_config.interval_min_us), 0,
-            0, 0, // slot
-            0, 1, // lazy, force
-            0, 0);
 
-    // TODO: Following is a major problem
+    ticker_stop(RADIO_TICKER_INSTANCE_ID_RADIO // instance
+            , MAYFLY_CALL_ID_0 // user
+            , trickle->ticker_id // id
+            , 0, 0); // operation fp & context
+
+    uint32_t err = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO // instance
+        , MAYFLY_CALL_ID_0 // user
+        , trickle->ticker_id // ticker id
+        , ticker_ticks_now_get() // anchor point
+        , TICKER_US_TO_TICKS(trickle->interval) // first interval
+        , TICKER_US_TO_TICKS(trickle->interval) // periodic interval
+        , TICKER_REMAINDER(trickle->interval) // remainder
+        , 0 // lazy
+        , 0 // slot
+        , trickle_timeout // timeout callback function
+        , trickle // context
+        , 0 // op func
+        , 0 // op context
+        );
+
     ASSERT(err != TICKER_STATUS_FAILURE);
 
     request_transmission(trickle);
@@ -279,9 +291,13 @@ transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, vo
     start_hfclk();
     configure_radio(tx_packet, 37, ADV_CH37);
 
-    NRF_GPIO->OUTSET = (1 << 1);
-    transmit(tx_packet, ADV_CH37);
-    NRF_GPIO->OUTCLR = (1 << 1);
+    if(trickle->c_count < trickle_config.c_threshold){
+        NRF_GPIO->OUTSET = (1 << 1);
+        transmit(tx_packet, ADV_CH37);
+        NRF_GPIO->OUTCLR = (1 << 1);        
+    }
+    // Set c counter to 0. 
+    trickle->c_count = 0;
 
     // The timer has done its job...
     ticker_stop(RADIO_TICKER_INSTANCE_ID_RADIO // instance
@@ -389,6 +405,7 @@ trickle_pdu_handle(uint8_t *packet_ptr, uint8_t packet_len) {
 void
 trickle_value_write(trickle_t *instance, slice_t key, slice_t val, uint8_t user_id) {
     printf("Internal (key: "); print_slice(key); printf(", val: "); print_slice(val); printf(")\n");
+    printf("Version: %d!\n", instance->version);
 
     slice_t old_val = trickle_config.get_val_fp((uint8_t *)instance);
     if (memcmp(val.ptr, old_val.ptr, val.len) || instance->version == 0) {
