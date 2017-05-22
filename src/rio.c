@@ -16,13 +16,13 @@
 
 // Elements are in [head, tail)
 
-packet_t outbox[RIO_N_PACKETS];
-uint32_t outbox_head       = 0;
-uint32_t outbox_tail       = 0;
+static packet_t outbox[RIO_N_PACKETS];
+static uint32_t outbox_head       = 0;
+static uint32_t outbox_tail       = 0;
 
-packet_t inbox[RIO_N_PACKETS];
-uint32_t inbox_head       = 0;
-uint32_t inbox_tail       = 0;
+static packet_t inbox[RIO_N_PACKETS];
+static uint32_t inbox_head       = 0;
+static uint32_t inbox_tail       = 0;
 
 packet_t *
 outbox_push() {
@@ -87,8 +87,8 @@ inbox_free_garbage();
 
 packet_t *
 inbox_front() {
-    inbox_free_garbage();
     ASSERT(!inbox[inbox_head].garbage); // (just to test)
+    // TODO skip garbage
 
     if (inbox_head == inbox_tail || inbox[inbox_head].complete) {
         return 0;
@@ -187,7 +187,7 @@ rio_isr_radio() {
             packet_t *old_packet = outbox_front();
             // The following IF should always be true but that changes when setting breakpoints
             if (old_packet && old_packet->transmitting == 1) {
-                outbox_pop_front();
+                outbox_pop_front(); /* TODO REENTRANT */
             }
         }
 
@@ -214,7 +214,7 @@ rio_isr_radio() {
         if (NRF_RADIO->EVENTS_END) {
 
             rx_new_packet();
-            packet_t *packet = inbox_front();
+            packet_t *packet = inbox_front(); /* TODO REENTRANT */
             packet->complete = 1;
             // TODO stop scanning if buffer full
             NRF_RADIO->TASKS_START = 1;

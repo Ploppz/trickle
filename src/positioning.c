@@ -93,7 +93,7 @@ make_key(uint8_t *dest, uint8_t *addr1, uint8_t *addr2) {
 // Interface //
 ///////////////
 
-// Generate key based on the index of the trickle instance in the array
+// Generate key based on the index of the trickle instance in the `instances` array
 // Return number of bytes written do `dest`
 uint8_t
 positioning_get_key(uint8_t *instance, uint8_t *dest) {
@@ -102,7 +102,6 @@ positioning_get_key(uint8_t *instance, uint8_t *dest) {
     return make_key(dest, addresses[i].address, addresses[j].address);
 }
 
-// Write data of a trickle instance to `dest`. Returns bytes written
 slice_t
 positioning_get_val(uint8_t *instance) {
     uint16_t i, j;

@@ -204,7 +204,7 @@ int main(void)
             // Copy the first 20 bytes
             uint32_t i = PDU_HDR_LEN + DEV_ADDR_LEN;
             for (; i<20; i ++) {
-                out_packet[i] = in_packet[i];
+                out_packet->data[i] = in_packet->data[i];
             }
 
             write_pdu_header(PDU_TYPE_ADV_IND, i - PDU_HDR_LEN - DEV_ADDR_LEN, addr_type, dev_addr, out_packet->data);
