@@ -22,6 +22,7 @@ typedef struct rio_config_t rio_config_t;
 struct packet_t {
     uint8_t data[MAX_PACKET_LEN];
     uint8_t state;
+    uint8_t rssi; // used only for RX
 };
 typedef struct packet_t packet_t;
 

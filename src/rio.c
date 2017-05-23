@@ -184,6 +184,10 @@ rio_isr_radio() {
             ASSERT(old_packet->state == TX_TRANSMITTING);
 
             outbox_pop_front(); /* TODO REENTRANT */
+        } else if (NRF_RADIO->EVENTS_READY) {
+
+            NRF_RADIO->SHORTS = 0;
+
         }
 
         if (NRF_RADIO->EVENTS_END || NRF_RADIO->EVENTS_READY) {
@@ -208,16 +212,21 @@ rio_isr_radio() {
             && NRF_RADIO->STATE != RADIO_STATE_STATE_TxIdle);
 
         if (NRF_RADIO->EVENTS_END) {
+            // Get RSSI
+            NRF_RADIO->TASKS_RSSISTOP = 1;
+            uint8_t rssi = NRF_RADIO->RSSISAMPLE;
             // Mark the previous packet as 'completed'
             packet_t *packet = inbox_back();
             packet->state = RX_COMPLETE;
+            packet->rssi = rssi;
 
+            // Start new
             rx_new_packet();
-            // TODO stop scanning if buffer full
             NRF_RADIO->TASKS_START = 1;
 
         } else if (NRF_RADIO->EVENTS_READY) {
 
+            NRF_RADIO->SHORTS = RADIO_SHORTS_ADDRESS_RSSISTART_Msk;
             NRF_RADIO->TASKS_START = 1;
 
         }

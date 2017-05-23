@@ -185,9 +185,10 @@ int main(void)
     irq_priority_set(RADIO_IRQn, CONFIG_BLUETOOTH_CONTROLLER_WORKER_PRIO);
 
 
+    irq_enable(RADIO_IRQn);
+    rio_init(10000);
+#if 0
     { // Testing rio: copy-cat
-        irq_enable(RADIO_IRQn);
-        rio_init(10000);
         while (1) {
             // Wait for incoming packet
             packet_t *in_packet = 0;
@@ -210,6 +211,7 @@ int main(void)
             rio_tx_finalize_packet(out_packet);
         }
     }
+#endif
 
     APP_FN(init)();
     APP_FN(run)();
@@ -244,17 +246,14 @@ toggle_run() {
     ASSERT(!err);
 
     while (1) { 
-        uint16_t handle = 0;
-        struct radio_pdu_node_rx *node_rx = 0;
-        uint8_t num_complete = radio_rx_get(&node_rx, &handle);
-
-        if (node_rx) {
-            radio_rx_dequeue();
-            // Handle PDU
-            trickle_pdu_handle(&node_rx->pdu_data[9], node_rx->pdu_data[1] - 6);
-            node_rx->hdr.onion.next = 0;
-            radio_rx_mem_release(&node_rx);
+        // Wait for incoming packet
+        packet_t *in_packet = 0;
+        while (!in_packet) {
+            in_packet = rio_rx_get_packet();
         }
+
+        trickle_pdu_handle(&in_packet->data[9], in_packet->data[1] - 6);
+
         if (NRF_RADIO->STATE == 3 || NRF_RADIO->STATE == 2 || NRF_RADIO->STATE == 1) {
             NRF_GPIO->OUTSET = (1 << 2);
         } else {
@@ -270,26 +269,30 @@ toggle_run() {
 
 void
 positioning_run() {
+    uint8_t buffer[MAX_PACKET_LEN];
     // Listen for packets
     // Discard meaningless packets (self <-> self)
     while (1) { 
-        uint16_t handle = 0;
-        struct radio_pdu_node_rx *node_rx = 0;
-        uint8_t num_complete = radio_rx_get(&node_rx, &handle);
+        // Wait for incoming packet
+        packet_t *in_packet = 0;
+        while (!in_packet) {
+            in_packet = rio_rx_get_packet();
+        }
+        if (in_packet->data[0] != 0x40) {
+            continue;
+        }
 
-        if (node_rx) {
-            radio_rx_dequeue();
-            uint32_t pdu_len = node_rx->pdu_data[1];
-            
-            trickle_pdu_handle(&node_rx->pdu_data[PDU_HDR_LEN + DEV_ADDR_LEN], pdu_len - 6);
 
-            if (is_positioning_node(&node_rx->pdu_data[PDU_HDR_LEN])) {
-                uint8_t rssi = node_rx->pdu_data[pdu_len + PDU_HDR_LEN];
-                positioning_register_rssi(rssi, &node_rx->pdu_data[PDU_HDR_LEN]);
-            }
+        memcpy(buffer, in_packet->data, MAX_PACKET_LEN);
+        
 
-            node_rx->hdr.onion.next = 0;
-            radio_rx_mem_release(&node_rx);
+        uint32_t pdu_len = buffer[1];
+        
+        trickle_pdu_handle(&buffer[PDU_HDR_LEN + DEV_ADDR_LEN], pdu_len - 6);
+
+        if (is_positioning_node(&buffer[PDU_HDR_LEN])) {
+            uint8_t rssi = in_packet->rssi;
+            positioning_register_rssi(rssi, &buffer[PDU_HDR_LEN]);
         }
 
         if (NRF_RADIO->STATE == 3 || NRF_RADIO->STATE == 2 || NRF_RADIO->STATE == 1) {
@@ -306,14 +309,6 @@ read_address() {
     *(uint32_t*)dev_addr = NRF_FICR->DEVICEADDR[0]; // 4 lowest uint8_ts
     *(uint16_t*)(dev_addr+4) = (uint16_t) (NRF_FICR->DEVICEADDR[1] & low_mask(16)); // 2 higher uint8_ts
     dev_addr[5] |= 0b11000000;
-}
-
-
-
-
-// Will be called when a packet has been received
-void radio_event_callback(void)
-{
 }
 
 

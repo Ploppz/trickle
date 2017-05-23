@@ -48,7 +48,7 @@ uint8_t tx_packet[MAX_PACKET_LEN];
 /////////////
 
 void
-request_transmission(trickle_t *trickle);
+schedule_transmission(trickle_t *trickle);
 void
 trickle_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context);
 void
@@ -100,7 +100,6 @@ trickle_init(struct trickle_t *instances, uint32_t n) {
             .ticker_id = trickle_config.first_ticker_id + i*TICKER_PER_TRICKLE,
 
         };
-        start_instance(&instances[i], MAYFLY_CALL_ID_PROGRAM);
     }
 }
 
@@ -137,9 +136,7 @@ trickle_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, voi
         , 0 // op context
         );
 
-    request_transmission(trickle);
-
-    // radio_disable();
+    schedule_transmission(trickle);
 }
 
 
@@ -147,7 +144,7 @@ trickle_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, voi
 
 
 void
-request_transmission(trickle_t *trickle) {
+schedule_transmission(trickle_t *trickle) {
     uint32_t random_transmit_time = rand_range(trickle->interval/2, trickle->interval - TRANSMISSION_TIME_US);
     uint32_t retval = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO // instance
         , MAYFLY_CALL_ID_0 // user
@@ -163,7 +160,6 @@ request_transmission(trickle_t *trickle) {
         , 0 // op func
         , 0 // op context
         );
-    // TODO there should be a decision point whether or not to send - hence perhaps no slot at this point
 }
 
 void
@@ -189,13 +185,14 @@ transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, vo
 
     packet_t *packet = rio_tx_start_packet();
     if (!packet) {
+        // outbox is full
         return;
     }
 
-    uint8_t *packet_ptr = tx_packet;
+    // packet_ptr moves forward as we write
+    uint8_t *packet_ptr = packet->data;
     packet_ptr += PDU_HDR_LEN + DEV_ADDR_LEN;
-
-    uint8_t *packet_start_ptr = packet_ptr;
+    uint8_t *payload_start_ptr = packet_ptr;
 
     // Version
     write_uint32(packet_ptr, trickle->version);
@@ -212,9 +209,9 @@ transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, vo
     memcpy(&packet_ptr[1], val.ptr, val.len);
     packet_ptr += 1 + val.len;
     
-    write_pdu_header(PDU_TYPE_ADV_IND, packet_ptr - packet_start_ptr, addr_type, dev_addr, tx_packet);
+    write_pdu_header(PDU_TYPE_ADV_IND, packet_ptr - payload_start_ptr, addr_type, dev_addr, packet->data);
 
-    memcpy(packet->data, tx_packet, sizeof(tx_packet));
+    rio_tx_finalize_packet(packet);
 }
 
 void
@@ -241,7 +238,7 @@ reset_timers(trickle_t *trickle, uint8_t user_id) {
         , 0 // op context
         );
     
-    request_transmission(trickle);
+    schedule_transmission(trickle);
 }
 
 

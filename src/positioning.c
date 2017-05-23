@@ -117,14 +117,20 @@ positioning_get_instance(slice_t key) {
     if (read_uint16(key.ptr) != APP_ID || key.len != KEY_LEN) {
         return 0;
     }
+
+    // Want to register the address even if the next IF is true.
+    // (note that `get_index` inserts address into `addresses`)
+    uint32_t i = get_index(key.ptr + 2);
+
     // Prohibit access to instances that reflect RSSI between a single device
     if (memcmp(key.ptr+2, key.ptr+8, 6) == 0
     // .... except self <-> self. It's used just for other nodes to get RSSI
             && memcmp(key.ptr+2, dev_addr, 6) != 0) {
         return 0;
     }
-    uint32_t i = get_index(key.ptr + 2);
+
     uint32_t j = get_index(key.ptr + 8);
+
     if (i == ~0 || j == ~0) {
         // Max number of addresses reached
         return 0;
