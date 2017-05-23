@@ -3,7 +3,6 @@
 from pynrfjprog import API, Hex
 import sys
 
-hex_file_path = "./Output/Debug/Exe/trickle.hex"
 
 def flash(hex_file_path):
     api = API.API('NRF51')
@@ -34,6 +33,10 @@ def flash(hex_file_path):
     api.close()
 
 if __name__ == '__main__':
+    assert len(sys.argv) == 2
+    hex_file_path = "./Output/Debug/Exe/" + sys.argv[1] + ".hex"
+    print("# Flashing %s" % hex_file_path)
+
     flash(hex_file_path)
     #  if len(sys.argv) > 1:
         #  hex_file_path = sys.argv[1]
