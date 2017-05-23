@@ -18,13 +18,7 @@ static uint8_t values[N_TRICKLE_NODES][N_TRICKLE_NODES];
 // Memory for trickle instances
 static uint8_t instances[N_TRICKLE_NODES][N_TRICKLE_NODES][TRICKLE_T_SIZE];
 
-// Access structure to map (address <-> index)
-typedef struct {
-    uint8_t present;
-    uint8_t address[6];
-} address_index_t;
-
-static address_index_t addresses[N_TRICKLE_NODES];
+static uint8_t addresses[N_TRICKLE_NODES][6];
 static uint16_t addresses_top = 0;
 
 extern uint8_t dev_addr[6];
@@ -51,13 +45,9 @@ positioning_init() {
 */
 uint32_t
 get_index(uint8_t *address) {
-    for (int i = 0; i < N_TRICKLE_NODES; i ++) {
-        if (addresses[i].present) {
-            if (memcmp(addresses[i].address, address, 6) == 0) {
-                return i;
-            }
-        } else {
-            break;
+    for (int i = 0; i < addresses_top; i ++) {
+        if (memcmp(addresses[i], address, 6) == 0) {
+            return i;
         }
     }
 
@@ -67,8 +57,7 @@ get_index(uint8_t *address) {
         // Max number of addresses reached
         return ~0;
     }
-    memcpy(addresses[new_index].address, address, 6);
-    addresses[new_index].present = 1;
+    memcpy(addresses[new_index], address, 6);
     return new_index;
 }
 
@@ -99,7 +88,7 @@ uint8_t
 positioning_get_key(uint8_t *instance, uint8_t *dest) {
     uint16_t i, j;
     get_double_index(instance, &i, &j);
-    return make_key(dest, addresses[i].address, addresses[j].address);
+    return make_key(dest, addresses[i], addresses[j]);
 }
 
 slice_t
@@ -154,13 +143,14 @@ positioning_register_rssi(uint8_t rssi, uint8_t *other_dev_addr) {
 
 uint8_t
 is_positioning_node(uint8_t *address) {
-    for (int i = 0; i < N_TRICKLE_NODES; i ++) {
-        if (addresses[i].present) {
-            if (memcmp(addresses[i].address, address, 6) == 0) {
-                return 1;
-            }
-        } else {
-            return 0;
+    for (int i = 0; i < addresses_top; i ++) {
+        if (memcmp(addresses[i], address, 6) == 0) {
+            return 1;
         }
     }
+    return 0;
+}
+
+void
+positioning_print() {
 }
