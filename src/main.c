@@ -316,10 +316,6 @@ void radio_event_callback(void)
 {
 }
 
-void toggle_line(uint32_t line)
-{
-    NRF_GPIO->OUT ^= 1 << line;
-}
 
 void gpiote_out_init(uint32_t index, uint32_t pin, uint32_t polarity, uint32_t init_val) {
     NRF_GPIOTE->CONFIG[index] |= ((GPIOTE_CONFIG_MODE_Task << GPIOTE_CONFIG_MODE_Pos) & GPIOTE_CONFIG_MODE_Msk) |
@@ -357,10 +353,6 @@ void init_ppi() {
     NRF_PPI->CHENSET = (1 << PPI_CH0) | (1 << PPI_CH1) | (1 << PPI_CH2) | (1 << PPI_CH3);
 }
 
-
-uint32_t low_mask(uint8_t n) {
-  return (1<<(n+1)) - 1;
-}
 
 
 void uart0_handler(void)

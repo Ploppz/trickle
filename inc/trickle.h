@@ -86,4 +86,8 @@ read_uint16(uint8_t *src);
 void
 write_uint16(uint8_t *dest, uint16_t src);
 
+
+void
+toggle_line(uint32_t line);
+
 #endif
