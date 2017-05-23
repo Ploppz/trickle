@@ -231,7 +231,7 @@ toggle_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void
 
 void
 toggle_run() {
-#define PERIOD_MS 1000
+    const uint32_t PERIOD_MS = 1000;
     uint32_t err = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO // instance
         , MAYFLY_CALL_ID_PROGRAM // user
         , TICKER_ID_APP // ticker id
@@ -268,7 +268,30 @@ toggle_run() {
 /////////////////////
 
 void
+positioning_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context) {
+    positioning_print();
+}
+
+void
 positioning_run() {
+    // Start timer just to have some means of getting data out
+    const uint32_t PERIOD_S = 10;
+    uint32_t err = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO // instance
+        , MAYFLY_CALL_ID_PROGRAM // user
+        , TICKER_ID_APP // ticker id
+        , ticker_ticks_now_get() // anchor point
+        , TICKER_US_TO_TICKS(PERIOD_S * 1e6) // first interval
+        , TICKER_US_TO_TICKS(PERIOD_S * 1e6) // periodic interval
+        , TICKER_REMAINDER(PERIOD_S * 1e6) // remainder
+        , 0 // lazy
+        , 0 // slot
+        , positioning_timeout // timeout callback function
+        , 0, 0, 0);
+    ASSERT(!err);
+
+
+
+
     uint8_t buffer[MAX_PACKET_LEN];
     // Listen for packets
     // Discard meaningless packets (self <-> self)
