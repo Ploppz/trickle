@@ -21,11 +21,7 @@ typedef struct rio_config_t rio_config_t;
 
 struct packet_t {
     uint8_t data[MAX_PACKET_LEN];
-    uint8_t complete;
-    union {
-        uint8_t transmitting;   // TX - in progress being transmitted
-        uint8_t garbage;        // RX - done, can be disposed
-    };
+    uint8_t state;
 };
 typedef struct packet_t packet_t;
 

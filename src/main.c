@@ -194,6 +194,8 @@ int main(void)
             while (!in_packet) {
                 in_packet = rio_rx_get_packet();
             }
+            uint8_t buffer[20];
+            memcpy (buffer, in_packet->data, sizeof(buffer));
 
             // Write new outgoing packet
             // Just in case the buffer is full - wait for available memory
@@ -202,12 +204,9 @@ int main(void)
                 out_packet = rio_tx_start_packet();
             }
             // Copy the first 20 bytes
-            uint32_t i = PDU_HDR_LEN + DEV_ADDR_LEN;
-            for (; i<20; i ++) {
-                out_packet->data[i] = in_packet->data[i];
-            }
+            memcpy(&out_packet->data[PDU_HDR_LEN + DEV_ADDR_LEN], buffer, sizeof(buffer));
 
-            write_pdu_header(PDU_TYPE_ADV_IND, i - PDU_HDR_LEN - DEV_ADDR_LEN, addr_type, dev_addr, out_packet->data);
+            write_pdu_header(PDU_TYPE_ADV_IND, sizeof(buffer), addr_type, dev_addr, out_packet->data);
             rio_tx_finalize_packet(out_packet);
         }
     }

@@ -8,6 +8,12 @@
 #include "ctrl.h"
 #include "debug.h"
 
+#define TX_ALLOCATED 0      // Allocated for writing
+#define TX_COMPLETE 1       // The packet has been written to and is ready
+#define TX_TRANSMITTING 2
+
+#define RX_ALLOCATED 0      // The packet will be written to
+#define RX_COMPLETE 1       // The packet has been written to and is ready
 
 
 /////////////////////
@@ -33,24 +39,25 @@ outbox_push() {
     } else {
         uint32_t prev_outbox_tail = outbox_tail;
         outbox_tail = next_outbox_tail;
-        outbox[prev_outbox_tail].complete = 0;
-        outbox[prev_outbox_tail].transmitting = 0;
+        outbox[prev_outbox_tail].state = TX_ALLOCATED;
         return &outbox[prev_outbox_tail];
     }
 }
 
+// If front is only allocated, not complete or transmitting, return 0.
 packet_t *
 outbox_front() {
-    if (outbox_head == outbox_tail || !outbox[outbox_head].complete) {
+    if (outbox_head == outbox_tail || outbox[outbox_head].state == TX_ALLOCATED) {
         return 0;
     } else {
         return &outbox[outbox_head];
     }
 }
 
+// If front is only allocated, not complete or transmitting, nothing happens.
 void
 outbox_pop_front() {
-    if (outbox_head == outbox_tail || !outbox[outbox_head].complete) {
+    if (outbox_head == outbox_tail || outbox[outbox_head].state == TX_ALLOCATED) {
         // EMPTY
     } else {
         outbox_head = (outbox_head+1) % RIO_N_PACKETS;
@@ -58,12 +65,17 @@ outbox_pop_front() {
 }
 
 uint8_t
-outbox_len() {
+outbox_pending() {
+    return outbox_head != outbox_tail
+        && outbox[outbox_head].state == TX_COMPLETE;
+    /* Previous code: outbox_len
+     * problem: needs to count only packets with TX_COMPLETE
     if (outbox_tail < outbox_head) {
         return RIO_N_PACKETS + outbox_tail - outbox_head;
     } else { // outbox_head <= outbox_tail
         return outbox_tail - outbox_head;
     }
+    */
 }
 
 packet_t *
@@ -75,22 +87,15 @@ inbox_push() {
     }
     uint32_t prev_inbox_tail = inbox_tail;
     inbox_tail = next_inbox_tail;
-    inbox[prev_inbox_tail].garbage = 0;
-    inbox[prev_inbox_tail].complete = 0;
+    inbox[prev_inbox_tail].state = RX_ALLOCATED;
     return &inbox[prev_inbox_tail];
 }
 
 // Inbox..
 
-void
-inbox_free_garbage();
-
 packet_t *
 inbox_front() {
-    ASSERT(!inbox[inbox_head].garbage); // (just to test)
-    // TODO skip garbage
-
-    if (inbox_head == inbox_tail || inbox[inbox_head].complete) {
+    if (inbox_head == inbox_tail || inbox[inbox_head].state != RX_COMPLETE) {
         return 0;
     } else {
         return &inbox[inbox_head];
@@ -107,26 +112,14 @@ inbox_back() {
     }
 }
 
-void
+packet_t *
 inbox_pop_front() {
-    if (inbox_head == inbox_tail || inbox[inbox_head].complete) {
+    if (inbox_head == inbox_tail || inbox[inbox_head].state != RX_COMPLETE) {
         // EMPTY
     } else {
+        uint32_t old_head = inbox_head;
         inbox_head = (inbox_head+1) % RIO_N_PACKETS;
-    }
-}
-
-void
-inbox_free_garbage() {
-    // Remove packets from beginning whose garbage=1, stop when reach packet with garbage=0.
-    uint32_t i = inbox_head;
-    while (i != inbox_tail) {
-        if (inbox[i].garbage) {
-            inbox_pop_front();
-        } else {
-            break;
-        }
-        i = (i+1) % RIO_N_PACKETS;
+        return &inbox[old_head];
     }
 }
 
@@ -177,6 +170,7 @@ rio_isr_radio() {
     if (state == STATE_TX) {
         ASSERT(NRF_RADIO->STATE != RADIO_STATE_STATE_Rx
             && NRF_RADIO->STATE != RADIO_STATE_STATE_RxIdle);
+
         if (NRF_RADIO->EVENTS_DISABLED) {
 
             NRF_RADIO->TASKS_TXEN = 1;
@@ -186,17 +180,19 @@ rio_isr_radio() {
             
             packet_t *old_packet = outbox_front();
             // The following IF should always be true but that changes when setting breakpoints
-            if (old_packet && old_packet->transmitting == 1) {
-                outbox_pop_front(); /* TODO REENTRANT */
-            }
+            ASSERT(old_packet);
+            ASSERT(old_packet->state == TX_TRANSMITTING);
+
+            outbox_pop_front(); /* TODO REENTRANT */
         }
 
         if (NRF_RADIO->EVENTS_END || NRF_RADIO->EVENTS_READY) {
             // Initiate new transmission
-            if (outbox_len() > 0) {
+            if (outbox_pending()) {
                 // Transmit again
                 packet_t *packet = outbox_front();
-                packet->transmitting = 1;
+                ASSERT(packet->state == TX_COMPLETE);
+                packet->state = TX_TRANSMITTING;
                 NRF_RADIO->PACKETPTR = (uint32_t) packet->data;
                 NRF_RADIO->TASKS_START = 1;
             } else {
@@ -212,10 +208,11 @@ rio_isr_radio() {
             && NRF_RADIO->STATE != RADIO_STATE_STATE_TxIdle);
 
         if (NRF_RADIO->EVENTS_END) {
+            // Mark the previous packet as 'completed'
+            packet_t *packet = inbox_back();
+            packet->state = RX_COMPLETE;
 
             rx_new_packet();
-            packet_t *packet = inbox_front(); /* TODO REENTRANT */
-            packet->complete = 1;
             // TODO stop scanning if buffer full
             NRF_RADIO->TASKS_START = 1;
 
@@ -235,8 +232,7 @@ rio_isr_radio() {
 
 void
 rio_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context) {
-    uint32_t len = outbox_len();
-    if (state == STATE_RX && len > 0) {
+    if (outbox_pending()) {
         if (state == STATE_RX) {
             state = STATE_TX;
             NRF_RADIO->TASKS_DISABLE = 1;
@@ -250,12 +246,11 @@ rio_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *c
 void
 rio_schedule_tx() {
     packet_t *packet = outbox_front();
-    if (packet == 0 || packet->transmitting == 1) {
+    if (packet == 0 || packet->state == TX_TRANSMITTING) {
         return;
     }
 
-    packet->transmitting = 1;
-
+    packet->state = TX_TRANSMITTING;
 
     NRF_RADIO->TASKS_TXEN   = 1;
 }
@@ -308,17 +303,11 @@ rio_tx_start_packet() {
 // Signal that the packet is done - no more writing
 void
 rio_tx_finalize_packet(packet_t *packet) {
-    packet->complete = 1;
+    packet->state = TX_COMPLETE;
 }
 
 
 packet_t *
 rio_rx_get_packet() {
-    return inbox_front();
-}
-
-void
-rio_rx_free_packet(packet_t *packet) {
-    packet->garbage = 1;
-    inbox_free_garbage();
+    return inbox_pop_front();
 }
