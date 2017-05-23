@@ -55,8 +55,6 @@ void
 prepare_transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context);
 void
 transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context);
-void
-toggle_line(uint32_t line);
 uint32_t
 rand_range(uint32_t min, uint32_t max);
 
