@@ -13,7 +13,7 @@ struct trickle_t;
 #define TRICKLE_T_SIZE 16
 
 
-#define TICKER_PER_TRICKLE 3 // Instances of ticker per instance of trickle
+#define TICKER_PER_TRICKLE 2 // Instances of ticker per instance of trickle
 
 
 typedef uint32_t trickle_version_t;

@@ -57,6 +57,8 @@ void
 transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context);
 uint32_t
 rand_range(uint32_t min, uint32_t max);
+void
+start_instance(trickle_t *instance, uint8_t user_id);
 
 uint32_t
 read_uint32(uint8_t *bytes) {
@@ -96,7 +98,9 @@ trickle_init(struct trickle_t *instances, uint32_t n) {
             .version = 0,
 
             .ticker_id = trickle_config.first_ticker_id + i*TICKER_PER_TRICKLE,
+
         };
+        start_instance(&instances[i], MAYFLY_CALL_ID_PROGRAM);
     }
 }
 
@@ -112,16 +116,26 @@ trickle_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, voi
     toggle_line(21);
     // Set the next interval
     trickle_next_interval(trickle);
-    uint32_t err = ticker_update(RADIO_TICKER_INSTANCE_ID_RADIO, // instance
-            MAYFLY_CALL_ID_0, // user
-            trickle->ticker_id, // ticker_id
-            TICKER_US_TO_TICKS(trickle->interval - trickle_config.interval_min_us), 0,
-            0, 0, // slot
-            0, 1, // lazy, force
-            0, 0);
 
-    // TODO: Following is a major problem
-    ASSERT(err != TICKER_STATUS_FAILURE);
+    ticker_stop(RADIO_TICKER_INSTANCE_ID_RADIO // instance
+            , MAYFLY_CALL_ID_0 // user
+            , trickle->ticker_id // id
+            , 0, 0); // operation fp & context
+
+    uint32_t err = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO // instance
+        , MAYFLY_CALL_ID_0 // user
+        , trickle->ticker_id // ticker id
+        , ticker_ticks_now_get() // anchor point
+        , TICKER_US_TO_TICKS(trickle->interval) // first interval
+        , TICKER_US_TO_TICKS(trickle->interval) // periodic interval
+        , TICKER_REMAINDER(trickle->interval) // remainder
+        , 0 // lazy
+        , 0 // slot
+        , trickle_timeout // timeout callback function
+        , trickle // context
+        , 0 // op func
+        , 0 // op context
+        );
 
     request_transmission(trickle);
 
@@ -130,32 +144,7 @@ trickle_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, voi
 
 
 
-void
-reset_timers(trickle_t *trickle, uint8_t user_id) {
-    // Stop periodic timer
-    ticker_stop(RADIO_TICKER_INSTANCE_ID_RADIO // instance
-            , user_id // user
-            , trickle->ticker_id // id
-            , 0, 0); // operation fp & context
 
-    // Start periodic timer
-    uint32_t retval = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO // instance
-        , user_id // user
-        , trickle->ticker_id // ticker id
-        , ticker_ticks_now_get() // anchor point
-        , TICKER_US_TO_TICKS(trickle_config.interval_min_us) // first interval
-        , TICKER_US_TO_TICKS(trickle_config.interval_min_us) // periodic interval
-        , TICKER_REMAINDER(trickle_config.interval_min_us) // remainder
-        , 0 // lazy
-        , 0 // slot
-        , trickle_timeout // timeout callback function
-        , trickle // context
-        , 0 // op func
-        , 0 // op context
-        );
-    
-    request_transmission(trickle);
-}
 
 void
 request_transmission(trickle_t *trickle) {
@@ -224,16 +213,35 @@ transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, vo
     packet_ptr += 1 + val.len;
     
     write_pdu_header(PDU_TYPE_ADV_IND, packet_ptr - packet_start_ptr, addr_type, dev_addr, tx_packet);
-    // Transmission
-    /* TODO
-    start_hfclk();
-    configure_radio(tx_packet, 37, ADV_CH37);
-    */
 
-    NRF_GPIO->OUTSET = (1 << 1);
-    transmit(tx_packet, ADV_CH37);
-    NRF_GPIO->OUTCLR = (1 << 1);
+    memcpy(packet->data, tx_packet, sizeof(tx_packet));
+}
 
+void
+reset_timers(trickle_t *trickle, uint8_t user_id) {
+    // Stop periodic timer
+    ticker_stop(RADIO_TICKER_INSTANCE_ID_RADIO // instance
+            , user_id // user
+            , trickle->ticker_id // id
+            , 0, 0); // operation fp & context
+
+    // Start periodic timer
+    uint32_t retval = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO // instance
+        , user_id // user
+        , trickle->ticker_id // ticker id
+        , ticker_ticks_now_get() // anchor point
+        , TICKER_US_TO_TICKS(trickle_config.interval_min_us) // first interval
+        , TICKER_US_TO_TICKS(trickle_config.interval_min_us) // periodic interval
+        , TICKER_REMAINDER(trickle_config.interval_min_us) // remainder
+        , 0 // lazy
+        , 0 // slot
+        , trickle_timeout // timeout callback function
+        , trickle // context
+        , 0 // op func
+        , 0 // op context
+        );
+    
+    request_transmission(trickle);
 }
 
 
@@ -343,10 +351,6 @@ trickle_value_write(trickle_t *instance, slice_t key, slice_t val, uint8_t user_
     }
 }
 
-uint32_t
-get_t_value(trickle_t *trickle){
-    return rand(trickle->interval/2, trickle->interval-1);
-}
 
 uint32_t
 rand_range(uint32_t min, uint32_t max) {
