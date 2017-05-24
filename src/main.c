@@ -36,11 +36,12 @@ uint8_t __noinit main_stack[2048];
 void * const isr_stack_top = isr_stack + sizeof(isr_stack);
 void * const main_stack_top = main_stack + sizeof(main_stack);
 
-#define TICKER_NODES (RADIO_TICKER_NODES + 1 + TICKER_PER_TRICKLE * N_TRICKLE_INSTANCES)
+#define RIO_TICKER_NODES (1)
+#define TICKER_NODES (RIO_TICKER_NODES + 1 + TICKER_PER_TRICKLE * N_TRICKLE_INSTANCES)
 
-#define TICKER_USER_WORKER_OPS (RADIO_TICKER_USER_WORKER_OPS + 10)
-#define TICKER_USER_JOB_OPS (RADIO_TICKER_USER_JOB_OPS + 10)
-#define TICKER_USER_APP_OPS (RADIO_TICKER_USER_APP_OPS + 10)
+#define TICKER_USER_WORKER_OPS (30)
+#define TICKER_USER_JOB_OPS (30)
+#define TICKER_USER_APP_OPS (30)
 #define TICKER_USER_OPS (TICKER_USER_WORKER_OPS + TICKER_USER_JOB_OPS + TICKER_USER_APP_OPS)
 
 static uint8_t ALIGNED(4) ticker_nodes[TICKER_NODES][TICKER_NODE_T_SIZE];
@@ -49,15 +50,14 @@ static uint8_t ALIGNED(4) ticker_user_ops[TICKER_USER_OPS][TICKER_USER_OP_T_SIZE
 
 
 static uint8_t ALIGNED(4) rng[3 + 4 + 1];
-static uint8_t ALIGNED(4) radio[RADIO_MEM_MNG_SIZE];
 
 
 #define SCAN_INTERVAL      0x0010 // 10 ms
 #define SCAN_WINDOW        0x000e // 8.75 ms
 #define SCAN_FILTER_POLICY 0
 
-#define TICKER_ID_APP (RADIO_TICKER_NODES)
-#define TICKER_ID_TRICKLE (RADIO_TICKER_NODES+1)
+#define TICKER_ID_APP (RIO_TICKER_NODES)
+#define TICKER_ID_TRICKLE (RIO_TICKER_NODES+1)
 
 
 ////////////
@@ -83,8 +83,9 @@ trickle_config_t trickle_config = {
 
 
 rio_config_t rio_config = {
-    .bt_channel = 37,
-    .rf_channel = ADV_CH37,
+    .bt_channel  = 5,
+    .rf_channel  = CH_INDEX5,
+    .access_addr = 0x84215142,
 };
 
 //////////////////
@@ -351,10 +352,10 @@ void init_ppi() {
     const uint32_t PPI_CH1 = 11;
     const uint32_t PPI_CH2 = 12;
     const uint32_t PPI_CH3 = 13;
-    gpiote_out_init(GPIO_CH0, 21, GPIOTE_CONFIG_POLARITY_Toggle, GPIOTE_CONFIG_OUTINIT_Low); // ready
-    gpiote_out_init(GPIO_CH1, 22, GPIOTE_CONFIG_POLARITY_Toggle, GPIOTE_CONFIG_OUTINIT_Low); // address
-    gpiote_out_init(GPIO_CH2, 23, GPIOTE_CONFIG_POLARITY_Toggle, GPIOTE_CONFIG_OUTINIT_Low); // end
-    gpiote_out_init(GPIO_CH3, 24, GPIOTE_CONFIG_POLARITY_Toggle, GPIOTE_CONFIG_OUTINIT_Low); // disabled
+    gpiote_out_init(GPIO_CH0, 10, GPIOTE_CONFIG_POLARITY_Toggle, GPIOTE_CONFIG_OUTINIT_Low); // ready
+    gpiote_out_init(GPIO_CH1, 11, GPIOTE_CONFIG_POLARITY_Toggle, GPIOTE_CONFIG_OUTINIT_Low); // address
+    gpiote_out_init(GPIO_CH2, 12, GPIOTE_CONFIG_POLARITY_Toggle, GPIOTE_CONFIG_OUTINIT_Low); // end
+    gpiote_out_init(GPIO_CH3, 13, GPIOTE_CONFIG_POLARITY_Toggle, GPIOTE_CONFIG_OUTINIT_Low); // disabled
 
     NRF_PPI->CH[PPI_CH0].EEP = (uint32_t) &(NRF_RADIO->EVENTS_READY);
     NRF_PPI->CH[PPI_CH0].TEP = (uint32_t) &(NRF_GPIOTE->TASKS_OUT[GPIO_CH0]);

@@ -14,7 +14,7 @@ void start_hfclk() {
     NRF_CLOCK->TASKS_HFCLKSTART = 1;
     while (NRF_CLOCK->EVENTS_HFCLKSTARTED == 0) {}
 }
-void configure_radio(uint8_t bt_channel, uint8_t rf_channel) {
+void configure_radio(uint8_t bt_channel, uint8_t rf_channel, uint32_t access_address) {
   NRF_RADIO->PCNF0 = (6 << RADIO_PCNF0_LFLEN_Pos) | 
                      (1 << RADIO_PCNF0_S0LEN_Pos) |
                      (2 << RADIO_PCNF0_S1LEN_Pos);
@@ -28,7 +28,7 @@ void configure_radio(uint8_t bt_channel, uint8_t rf_channel) {
   NRF_RADIO->TXPOWER = RADIO_TXPOWER_TXPOWER_0dBm;
   NRF_RADIO->MODE = RADIO_MODE_MODE_Ble_1Mbit;
 
-  set_address0(0x8E89BED6);
+  set_address0(access_address);
 
   NRF_RADIO->TXADDRESS = 0; // BASE0 + PREFIX0
   NRF_RADIO->RXADDRESSES = 0b1;

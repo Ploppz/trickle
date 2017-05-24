@@ -15,6 +15,7 @@
 #define RX_ALLOCATED 0      // The packet will be written to
 #define RX_COMPLETE 1       // The packet has been written to and is ready
 
+void toggle_line(uint32_t line);
 
 /////////////////////
 // Circular buffer //
@@ -25,6 +26,7 @@
 static packet_t outbox[RIO_N_PACKETS];
 static uint32_t outbox_head       = 0;
 static uint32_t outbox_tail       = 0;
+// static uint32_t outbox_isr_head   = 0;
 
 static packet_t inbox[RIO_N_PACKETS];
 static uint32_t inbox_head       = 0;
@@ -198,6 +200,7 @@ rio_isr_radio() {
                 ASSERT(packet->state == TX_COMPLETE);
                 packet->state = TX_TRANSMITTING;
                 NRF_RADIO->PACKETPTR = (uint32_t) packet->data;
+
                 NRF_RADIO->TASKS_START = 1;
             } else {
                 // Ramp-down & start scanning
@@ -249,9 +252,26 @@ rio_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *c
             state = STATE_TX;
             NRF_RADIO->TASKS_TXEN = 1;
         }
+    } else {
+        /** TODO
+         * Fixing the symptoms of a bug that I can't find the source of...
+         * Sometimes, when there is (for example) one element in outbox, and it is marked for transmission
+         * by TX_TRANSMITTING... it appears it won't ever get the END event while in state==STATE_TX.
+         * Hence the outbox gets full without ever again transmitting.
+         * A possible reason for unexpected behaviour is context unsafety which should be looked into.
+         *
+         * Quickfix: pop outbox.
+         *
+         */
+        if (outbox_head != outbox_tail && outbox[outbox_head].state == TX_TRANSMITTING) {
+            if (!(NRF_RADIO->STATE == RADIO_STATE_STATE_Tx || NRF_RADIO->STATE == RADIO_STATE_STATE_TxIdle)) {
+                outbox_pop_front();
+            }
+        }
     }
 }
 
+// TODO unused.. needed?
 void
 rio_schedule_tx() {
     packet_t *packet = outbox_front();
@@ -278,7 +298,7 @@ rio_init(uint32_t interval_us) {
                         | RADIO_INTENSET_DISABLED_Msk;
 
     start_hfclk();
-    configure_radio(rio_config.bt_channel, rio_config.rf_channel);
+    configure_radio(rio_config.bt_channel, rio_config.rf_channel, rio_config.access_addr);
 
     rx_new_packet();
 
@@ -306,6 +326,8 @@ rio_init(uint32_t interval_us) {
 
 packet_t *
 rio_tx_start_packet() {
+    // Pop packets that radio has transmitted - done here because of context safety
+
     return outbox_push();
 }
 

@@ -116,12 +116,16 @@ trickle_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, voi
     // Set the next interval
     trickle_next_interval(trickle);
 
-    ticker_stop(RADIO_TICKER_INSTANCE_ID_RADIO // instance
+    /** PROBLEM
+     * Failure to stop ticker timer seems to lead to failure to also start it.
+     */
+
+    uint32_t err = ticker_stop(RADIO_TICKER_INSTANCE_ID_RADIO // instance
             , MAYFLY_CALL_ID_0 // user
             , trickle->ticker_id // id
             , 0, 0); // operation fp & context
 
-    uint32_t err = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO // instance
+    err = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO // instance
         , MAYFLY_CALL_ID_0 // user
         , trickle->ticker_id // ticker id
         , ticker_ticks_now_get() // anchor point
@@ -135,6 +139,7 @@ trickle_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, voi
         , 0 // op func
         , 0 // op context
         );
+    ASSERT(err != TICKER_STATUS_FAILURE);
 
     schedule_transmission(trickle);
 }
@@ -165,7 +170,6 @@ schedule_transmission(trickle_t *trickle) {
 void
 transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context) {
     trickle_t *trickle = (trickle_t *) context;
-    toggle_line(22);
     // The timer has done its job...
     ticker_stop(RADIO_TICKER_INSTANCE_ID_RADIO // instance
             , MAYFLY_CALL_ID_0 // user
@@ -212,6 +216,8 @@ transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, vo
     write_pdu_header(PDU_TYPE_ADV_IND, packet_ptr - payload_start_ptr, addr_type, dev_addr, packet->data);
 
     rio_tx_finalize_packet(packet);
+    toggle_line(22);
+
 }
 
 void
@@ -223,7 +229,7 @@ reset_timers(trickle_t *trickle, uint8_t user_id) {
             , 0, 0); // operation fp & context
 
     // Start periodic timer
-    uint32_t retval = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO // instance
+    uint32_t err = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO // instance
         , user_id // user
         , trickle->ticker_id // ticker id
         , ticker_ticks_now_get() // anchor point
@@ -237,6 +243,7 @@ reset_timers(trickle_t *trickle, uint8_t user_id) {
         , 0 // op func
         , 0 // op context
         );
+    ASSERT(err != TICKER_STATUS_FAILURE);
     
     schedule_transmission(trickle);
 }
@@ -332,6 +339,7 @@ trickle_pdu_handle(uint8_t *packet_ptr, uint8_t packet_len) {
     if (instance) {
         if (version > instance->version) {
             printf("External (key: "); print_slice(key); printf(", val: "); print_slice(val); printf(")\n");
+            toggle_line(23);
         }
         value_register(instance, key, val, version, MAYFLY_CALL_ID_PROGRAM);
     }

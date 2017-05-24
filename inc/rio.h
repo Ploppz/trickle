@@ -15,6 +15,7 @@
 struct rio_config_t {
     uint8_t bt_channel;
     uint8_t rf_channel;
+    uint32_t access_addr;
 };
 typedef struct rio_config_t rio_config_t;
 
