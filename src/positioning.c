@@ -67,7 +67,6 @@ get_index(uint8_t *address) {
 
 void
 get_double_index(uint8_t *instance, uint32_t *i, uint32_t *j) {
-
     uint32_t index = (instance - (uint8_t*)instances) / TRICKLE_T_SIZE;
     // Convert from index to (i, j) index into 2D array
     *i = index / N_TRICKLE_NODES;

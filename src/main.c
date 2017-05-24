@@ -70,8 +70,8 @@ static uint8_t ALIGNED(4) rng[3 + 4 + 1];
 #define APP_FN(FN_NAME) CAT(CAT(APP_NAME, _), FN_NAME)
 
 trickle_config_t trickle_config = {
-    .interval_min_us = 1000,
-    .interval_max_us = 1000000,
+    .interval_min_us = 100 * 1e3,
+    .interval_max_us = 3 * 1e6,
     .c_threshold = 2,
     
     .first_ticker_id =  TICKER_ID_TRICKLE,
@@ -293,7 +293,6 @@ positioning_run() {
 
 
 
-    uint8_t buffer[MAX_PACKET_LEN];
     // Listen for packets
     // Discard meaningless packets (self <-> self)
     while (1) { 
@@ -307,16 +306,13 @@ positioning_run() {
         }
 
 
-        memcpy(buffer, in_packet->data, MAX_PACKET_LEN);
+        uint32_t pdu_len = in_packet->data[1];
         
+        trickle_pdu_handle(&in_packet->data[PDU_HDR_LEN + DEV_ADDR_LEN], pdu_len - 6);
 
-        uint32_t pdu_len = buffer[1];
-        
-        trickle_pdu_handle(&buffer[PDU_HDR_LEN + DEV_ADDR_LEN], pdu_len - 6);
-
-        if (is_positioning_node(&buffer[PDU_HDR_LEN])) {
+        if (is_positioning_node(&in_packet->data[PDU_HDR_LEN])) {
             uint8_t rssi = in_packet->rssi;
-            positioning_register_rssi(rssi, &buffer[PDU_HDR_LEN]);
+            positioning_register_rssi(rssi, &in_packet->data[PDU_HDR_LEN]);
         }
 
         if (NRF_RADIO->STATE == 3 || NRF_RADIO->STATE == 2 || NRF_RADIO->STATE == 1) {

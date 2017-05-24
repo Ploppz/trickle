@@ -1,9 +1,9 @@
 #include <stdint.h>
+#include "SEGGER_RTT.c"
 
 #include "rio.h"
 #include "tx.h"
 
-// PhoenixLL
 #include "ticker.h"
 #include "ctrl.h"
 #include "debug.h"
@@ -31,6 +31,24 @@ static uint32_t outbox_tail       = 0;
 static packet_t inbox[RIO_N_PACKETS];
 static uint32_t inbox_head       = 0;
 static uint32_t inbox_tail       = 0;
+
+/* len functions for testing.. */
+uint32_t
+outbox_len() {
+    if (outbox_head <= outbox_tail) {
+        return outbox_tail - outbox_head;
+    } else {
+        return RIO_N_PACKETS - (outbox_head - outbox_tail);
+    }
+}
+uint32_t
+inbox_len() {
+    if (inbox_head <= inbox_tail) {
+        return inbox_tail - inbox_head;
+    } else {
+        return RIO_N_PACKETS - (inbox_head - inbox_tail);
+    }
+}
 
 packet_t *
 outbox_push() {
@@ -83,6 +101,7 @@ outbox_pending() {
 packet_t *
 inbox_push() {
     uint32_t next_inbox_tail = (inbox_tail+1) % RIO_N_PACKETS;
+    ASSERT(next_inbox_tail != inbox_head);
     if (next_inbox_tail == inbox_head) {
         // Full buffer - the oldest packet is forgotten
         inbox_head = (inbox_head+1) % RIO_N_PACKETS;
@@ -215,16 +234,19 @@ rio_isr_radio() {
             && NRF_RADIO->STATE != RADIO_STATE_STATE_TxIdle);
 
         if (NRF_RADIO->EVENTS_END) {
-            // Get RSSI
-            NRF_RADIO->TASKS_RSSISTOP = 1;
-            uint8_t rssi = NRF_RADIO->RSSISAMPLE;
-            // Mark the previous packet as 'completed'
-            packet_t *packet = inbox_back();
-            packet->state = RX_COMPLETE;
-            packet->rssi = rssi;
+            // Only save the packet if CRC was ok
+            if (NRF_RADIO->CRCSTATUS == RADIO_CRCSTATUS_CRCSTATUS_CRCOk) {
+                // Get RSSI
+                NRF_RADIO->TASKS_RSSISTOP = 1;
+                uint8_t rssi = NRF_RADIO->RSSISAMPLE;
+                // Mark the previous packet as 'completed'
+                packet_t *packet = inbox_back();
+                packet->state = RX_COMPLETE;
+                packet->rssi = rssi;
+                // Next packet ptr
+                rx_new_packet();
+            }
 
-            // Start new
-            rx_new_packet();
             NRF_RADIO->TASKS_START = 1;
 
         } else if (NRF_RADIO->EVENTS_READY) {

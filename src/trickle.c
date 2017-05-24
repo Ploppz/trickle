@@ -124,6 +124,10 @@ trickle_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, voi
             , MAYFLY_CALL_ID_0 // user
             , trickle->ticker_id // id
             , 0, 0); // operation fp & context
+    if (err == TICKER_STATUS_FAILURE) {
+        printf("# ERROR in trickle_timeout");
+        return;
+    }
 
     err = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO // instance
         , MAYFLY_CALL_ID_0 // user
@@ -223,13 +227,17 @@ transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, vo
 void
 reset_timers(trickle_t *trickle, uint8_t user_id) {
     // Stop periodic timer
-    ticker_stop(RADIO_TICKER_INSTANCE_ID_RADIO // instance
+    uint32_t err = ticker_stop(RADIO_TICKER_INSTANCE_ID_RADIO // instance
             , user_id // user
             , trickle->ticker_id // id
             , 0, 0); // operation fp & context
+    if (err == TICKER_STATUS_FAILURE) {
+        printf("# ERROR in reset_timers");
+        return;
+    }
 
     // Start periodic timer
-    uint32_t err = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO // instance
+    err = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO // instance
         , user_id // user
         , trickle->ticker_id // ticker id
         , ticker_ticks_now_get() // anchor point
