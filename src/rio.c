@@ -245,6 +245,9 @@ rio_isr_radio() {
                 packet->rssi = rssi;
                 // Next packet ptr
                 rx_new_packet();
+            } else {
+                // (don't know if necessary but better safe than sorry)
+                NRF_RADIO->PACKETPTR = (uint32_t) inbox_back()->data;
             }
 
             NRF_RADIO->TASKS_START = 1;
@@ -252,6 +255,7 @@ rio_isr_radio() {
         } else if (NRF_RADIO->EVENTS_READY) {
 
             NRF_RADIO->SHORTS = RADIO_SHORTS_ADDRESS_RSSISTART_Msk;
+            NRF_RADIO->PACKETPTR = (uint32_t) inbox_back()->data;
             NRF_RADIO->TASKS_START = 1;
 
         }

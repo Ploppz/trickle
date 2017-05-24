@@ -52,10 +52,6 @@ static uint8_t ALIGNED(4) ticker_user_ops[TICKER_USER_OPS][TICKER_USER_OP_T_SIZE
 static uint8_t ALIGNED(4) rng[3 + 4 + 1];
 
 
-#define SCAN_INTERVAL      0x0010 // 10 ms
-#define SCAN_WINDOW        0x000e // 8.75 ms
-#define SCAN_FILTER_POLICY 0
-
 #define TICKER_ID_APP (RIO_TICKER_NODES)
 #define TICKER_ID_TRICKLE (RIO_TICKER_NODES+1)
 
@@ -70,8 +66,8 @@ static uint8_t ALIGNED(4) rng[3 + 4 + 1];
 #define APP_FN(FN_NAME) CAT(CAT(APP_NAME, _), FN_NAME)
 
 trickle_config_t trickle_config = {
-    .interval_min_us = 100 * 1e3,
-    .interval_max_us = 3 * 1e6,
+    .interval_min_us = 500 * 1e3,
+    .interval_max_us = 10 * 1e6,
     .c_threshold = 2,
     
     .first_ticker_id =  TICKER_ID_TRICKLE,
@@ -161,10 +157,10 @@ int main(void)
     irq_enable(POWER_CLOCK_IRQn);
 
     cntr_init();
-    irq_priority_set(RTC0_IRQn, CONFIG_BLUETOOTH_CONTROLLER_WORKER_PRIO);
+    irq_priority_set(RTC0_IRQn, 0xFD);
     irq_enable(RTC0_IRQn);
 
-    irq_priority_set(SWI4_IRQn, CONFIG_BLUETOOTH_CONTROLLER_JOB_PRIO);
+    irq_priority_set(SWI4_IRQn, 0xFE);
     irq_enable(SWI4_IRQn);
 
     ticker_users[MAYFLY_CALL_ID_0][0]       = TICKER_USER_WORKER_OPS;
@@ -183,9 +179,7 @@ int main(void)
 
     irq_priority_set(ECB_IRQn, 0xFF);
 
-    irq_priority_set(RADIO_IRQn, CONFIG_BLUETOOTH_CONTROLLER_WORKER_PRIO);
-
-
+    irq_priority_set(RADIO_IRQn, 0xFD);
     irq_enable(RADIO_IRQn);
     rio_init(10000);
 #if 0

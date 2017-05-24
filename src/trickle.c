@@ -346,7 +346,7 @@ trickle_pdu_handle(uint8_t *packet_ptr, uint8_t packet_len) {
     trickle_t *instance = trickle_config.get_instance_fp(key);
     if (instance) {
         if (version > instance->version) {
-            printf("External (key: "); print_slice(key); printf(", val: "); print_slice(val); printf(")\n");
+            // printf("External (key: "); print_slice(key); printf(", val: "); print_slice(val); printf(")\n");
             toggle_line(23);
         }
         value_register(instance, key, val, version, MAYFLY_CALL_ID_PROGRAM);
@@ -355,7 +355,7 @@ trickle_pdu_handle(uint8_t *packet_ptr, uint8_t packet_len) {
 
 void
 trickle_value_write(trickle_t *instance, slice_t key, slice_t val, uint8_t user_id) {
-    printf("Internal (key: "); print_slice(key); printf(", val: "); print_slice(val); printf(")\n");
+    // printf("Internal (key: "); print_slice(key); printf(", val: "); print_slice(val); printf(")\n");
 
     slice_t old_val = trickle_config.get_val_fp((uint8_t *)instance);
     if (memcmp(val.ptr, old_val.ptr, val.len) || instance->version == 0) {
