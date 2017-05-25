@@ -1,6 +1,7 @@
 #include "trickle.h"
 #include "tx.h"
 #include "slice.h"
+#include "rio.h"
 #include "positioning.h"
 #include "toggle.h"
 
@@ -35,11 +36,12 @@ uint8_t __noinit main_stack[2048];
 void * const isr_stack_top = isr_stack + sizeof(isr_stack);
 void * const main_stack_top = main_stack + sizeof(main_stack);
 
-#define TICKER_NODES (RADIO_TICKER_NODES + 1 + TICKER_PER_TRICKLE * N_TRICKLE_INSTANCES)
+#define RIO_TICKER_NODES (1)
+#define TICKER_NODES (RIO_TICKER_NODES + 1 + TICKER_PER_TRICKLE * N_TRICKLE_INSTANCES)
 
-#define TICKER_USER_WORKER_OPS (RADIO_TICKER_USER_WORKER_OPS + 10)
-#define TICKER_USER_JOB_OPS (RADIO_TICKER_USER_JOB_OPS + 10)
-#define TICKER_USER_APP_OPS (RADIO_TICKER_USER_APP_OPS + 10)
+#define TICKER_USER_WORKER_OPS (30)
+#define TICKER_USER_JOB_OPS (30)
+#define TICKER_USER_APP_OPS (30)
 #define TICKER_USER_OPS (TICKER_USER_WORKER_OPS + TICKER_USER_JOB_OPS + TICKER_USER_APP_OPS)
 
 static uint8_t ALIGNED(4) ticker_nodes[TICKER_NODES][TICKER_NODE_T_SIZE];
@@ -48,20 +50,15 @@ static uint8_t ALIGNED(4) ticker_user_ops[TICKER_USER_OPS][TICKER_USER_OP_T_SIZE
 
 
 static uint8_t ALIGNED(4) rng[3 + 4 + 1];
-static uint8_t ALIGNED(4) radio[RADIO_MEM_MNG_SIZE];
 
 
-#define SCAN_INTERVAL      0x0010 // 10 ms
-#define SCAN_WINDOW        0x000e // 8.75 ms
-#define SCAN_FILTER_POLICY 0
-
-#define TICKER_ID_APP (RADIO_TICKER_NODES)
-#define TICKER_ID_TRICKLE (RADIO_TICKER_NODES+1)
+#define TICKER_ID_APP (RIO_TICKER_NODES)
+#define TICKER_ID_TRICKLE (RIO_TICKER_NODES+1)
 
 
-/////////////
-// Trickle //
-/////////////
+////////////
+// Config //
+////////////
 
 // Macro to construct {APP_NAME}_{FN_NAME}
 #define CAT(x, y) CAT_(x, y)
@@ -69,8 +66,8 @@ static uint8_t ALIGNED(4) radio[RADIO_MEM_MNG_SIZE];
 #define APP_FN(FN_NAME) CAT(CAT(APP_NAME, _), FN_NAME)
 
 trickle_config_t trickle_config = {
-    .interval_min_us = 1000,
-    .interval_max_us = 1000000,
+    .interval_min_us = 500 * 1e3,
+    .interval_max_us = 10 * 1e6,
     .c_threshold = 2,
     
     .first_ticker_id =  TICKER_ID_TRICKLE,
@@ -78,6 +75,13 @@ trickle_config_t trickle_config = {
     .get_key_fp = &APP_FN(get_key),
     .get_val_fp = &APP_FN(get_val),
     .get_instance_fp = &APP_FN(get_instance),
+};
+
+
+rio_config_t rio_config = {
+    .bt_channel  = 5,
+    .rf_channel  = CH_INDEX5,
+    .access_addr = 0x84215142,
 };
 
 //////////////////
@@ -114,13 +118,21 @@ int main(void)
     uint32_t retval;
     DEBUG_INIT();
 
-    /* Dongle RGB LED */
-    NRF_GPIO->DIRSET = (0b1111 << 21) | (1 << 1) | (1 << 2) | (1 << 3) | (1 << 4) | (1 << 10) | (1 << 11) | (1 << 12) | (1 << 16) | (1 << 17) | (1 << 18) | (1 << 19) | (1 << 20);
-    NRF_GPIO->OUTSET = (0b1111 << 21) | (1 << 1) | (1 << 2) | (1 << 3) | (1 << 4) | (1 << 10) | (1 << 11) | (1 << 12) | (1 << 16) | (1 << 17) | (1 << 18) | (1 << 19) | (1 << 20);
-    
+    // pins 1-4, 10-12, 16-24
+    //                    31     24      16      8       0
+    //                    |------||------||------||------|
+    uint32_t out_pins = 0b00000001111111110001110000011110;
+    NRF_GPIO->DIRSET = out_pins;
+    NRF_GPIO->OUTSET = out_pins;
+
     NRF_GPIO->OUTCLR = (1 << 1);
     NRF_GPIO->DIRSET = (1 << 15);
     NRF_GPIO->OUTSET = (1 << 15);
+
+    init_ppi();
+    read_address();
+
+
 
 
     #if UART
@@ -139,17 +151,16 @@ int main(void)
 
     /* Mayfly shall be initialized before any ISR executes */
     mayfly_init();
-    //init_ppi();
 
     clock_k32src_start(1);
     irq_priority_set(POWER_CLOCK_IRQn, 0xFF);
     irq_enable(POWER_CLOCK_IRQn);
 
     cntr_init();
-    irq_priority_set(RTC0_IRQn, CONFIG_BLUETOOTH_CONTROLLER_WORKER_PRIO);
+    irq_priority_set(RTC0_IRQn, 0xFD);
     irq_enable(RTC0_IRQn);
 
-    irq_priority_set(SWI4_IRQn, CONFIG_BLUETOOTH_CONTROLLER_JOB_PRIO);
+    irq_priority_set(SWI4_IRQn, 0xFE);
     irq_enable(SWI4_IRQn);
 
     ticker_users[MAYFLY_CALL_ID_0][0]       = TICKER_USER_WORKER_OPS;
@@ -168,28 +179,34 @@ int main(void)
 
     irq_priority_set(ECB_IRQn, 0xFF);
 
-    retval = radio_init(7, /* 20ppm = 7 ... 250ppm = 1, 500ppm = 0 */
-                RADIO_CONNECTION_CONTEXT_MAX,
-                RADIO_PACKET_COUNT_RX_MAX,
-                RADIO_PACKET_COUNT_TX_MAX,
-                RADIO_LL_LENGTH_OCTETS_RX_MAX,
-                RADIO_PACKET_TX_DATA_SIZE,
-                &radio[0], sizeof(radio));
-    ASSERT(!retval);
+    irq_priority_set(RADIO_IRQn, 0xFD);
+    irq_enable(RADIO_IRQn);
+    rio_init(10000);
+#if 0
+    { // Testing rio: copy-cat
+        while (1) {
+            // Wait for incoming packet
+            packet_t *in_packet = 0;
+            while (!in_packet) {
+                in_packet = rio_rx_get_packet();
+            }
+            uint8_t buffer[20];
+            memcpy (buffer, in_packet->data, sizeof(buffer));
 
-    irq_priority_set(RADIO_IRQn, CONFIG_BLUETOOTH_CONTROLLER_WORKER_PRIO);
+            // Write new outgoing packet
+            // Just in case the buffer is full - wait for available memory
+            packet_t *out_packet = 0;
+            while (!out_packet) {
+                out_packet = rio_tx_start_packet();
+            }
+            // Copy the first 20 bytes
+            memcpy(&out_packet->data[PDU_HDR_LEN + DEV_ADDR_LEN], buffer, sizeof(buffer));
 
-    read_address();
-    // Start scanning
-    // (TODO investigate which of these lines are necessary)
-
-    uint8_t scn_data[] = {0x02, 0x01, 0x06, 0x0B, 0x08, 'P', 'h', 'o', 'e', 'n', 'i', 'x', ' ', 'L', 'L'};
-    ll_address_set(addr_type, dev_addr);
-    ll_scan_data_set(sizeof(scn_data), scn_data);
-
-    ll_scan_params_set(0, SCAN_INTERVAL, SCAN_WINDOW, addr_type, SCAN_FILTER_POLICY);
-    retval = ll_scan_enable(1);
-    ASSERT(!retval);
+            write_pdu_header(PDU_TYPE_ADV_IND, sizeof(buffer), addr_type, dev_addr, out_packet->data);
+            rio_tx_finalize_packet(out_packet);
+        }
+    }
+#endif
 
     APP_FN(init)();
     APP_FN(run)();
@@ -209,7 +226,7 @@ toggle_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void
 
 void
 toggle_run() {
-#define PERIOD_MS 1000
+    const uint32_t PERIOD_MS = 1000;
     uint32_t err = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO // instance
         , MAYFLY_CALL_ID_PROGRAM // user
         , TICKER_ID_APP // ticker id
@@ -224,17 +241,14 @@ toggle_run() {
     ASSERT(!err);
 
     while (1) { 
-        uint16_t handle = 0;
-        struct radio_pdu_node_rx *node_rx = 0;
-        uint8_t num_complete = radio_rx_get(&node_rx, &handle);
-
-        if (node_rx) {
-            radio_rx_dequeue();
-            // Handle PDU
-            trickle_pdu_handle(&node_rx->pdu_data[9], node_rx->pdu_data[1] - 6);
-            node_rx->hdr.onion.next = 0;
-            radio_rx_mem_release(&node_rx);
+        // Wait for incoming packet
+        packet_t *in_packet = 0;
+        while (!in_packet) {
+            in_packet = rio_rx_get_packet();
         }
+
+        trickle_pdu_handle(&in_packet->data[9], in_packet->data[1] - 6);
+
         if (NRF_RADIO->STATE == 3 || NRF_RADIO->STATE == 2 || NRF_RADIO->STATE == 1) {
             NRF_GPIO->OUTSET = (1 << 2);
         } else {
@@ -249,27 +263,50 @@ toggle_run() {
 /////////////////////
 
 void
+positioning_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context) {
+    positioning_print();
+}
+
+void
 positioning_run() {
+    // Start timer just to have some means of getting data out
+    const uint32_t PERIOD_S = 10;
+    uint32_t err = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO // instance
+        , MAYFLY_CALL_ID_PROGRAM // user
+        , TICKER_ID_APP // ticker id
+        , ticker_ticks_now_get() // anchor point
+        , TICKER_US_TO_TICKS(PERIOD_S * 1e6) // first interval
+        , TICKER_US_TO_TICKS(PERIOD_S * 1e6) // periodic interval
+        , TICKER_REMAINDER(PERIOD_S * 1e6) // remainder
+        , 0 // lazy
+        , 0 // slot
+        , positioning_timeout // timeout callback function
+        , 0, 0, 0);
+    ASSERT(!err);
+
+
+
+
     // Listen for packets
     // Discard meaningless packets (self <-> self)
     while (1) { 
-        uint16_t handle = 0;
-        struct radio_pdu_node_rx *node_rx = 0;
-        uint8_t num_complete = radio_rx_get(&node_rx, &handle);
+        // Wait for incoming packet
+        packet_t *in_packet = 0;
+        while (!in_packet) {
+            in_packet = rio_rx_get_packet();
+        }
+        if (in_packet->data[0] != 0x40) {
+            continue;
+        }
 
-        if (node_rx) {
-            radio_rx_dequeue();
-            uint32_t pdu_len = node_rx->pdu_data[1];
-            
-            trickle_pdu_handle(&node_rx->pdu_data[PDU_HDR_LEN + DEV_ADDR_LEN], pdu_len - 6);
 
-            if (is_positioning_node(&node_rx->pdu_data[PDU_HDR_LEN])) {
-                uint8_t rssi = node_rx->pdu_data[pdu_len + PDU_HDR_LEN];
-                positioning_register_rssi(rssi, &node_rx->pdu_data[PDU_HDR_LEN]);
-            }
+        uint32_t pdu_len = in_packet->data[1];
+        
+        trickle_pdu_handle(&in_packet->data[PDU_HDR_LEN + DEV_ADDR_LEN], pdu_len - 6);
 
-            node_rx->hdr.onion.next = 0;
-            radio_rx_mem_release(&node_rx);
+        if (is_positioning_node(&in_packet->data[PDU_HDR_LEN])) {
+            uint8_t rssi = in_packet->rssi;
+            positioning_register_rssi(rssi, &in_packet->data[PDU_HDR_LEN]);
         }
 
         if (NRF_RADIO->STATE == 3 || NRF_RADIO->STATE == 2 || NRF_RADIO->STATE == 1) {
@@ -289,18 +326,6 @@ read_address() {
 }
 
 
-
-
-// Will be called when a packet has been received
-void radio_event_callback(void)
-{
-}
-
-void toggle_line(uint32_t line)
-{
-    NRF_GPIO->OUT ^= 1 << line;
-}
-
 void gpiote_out_init(uint32_t index, uint32_t pin, uint32_t polarity, uint32_t init_val) {
     NRF_GPIOTE->CONFIG[index] |= ((GPIOTE_CONFIG_MODE_Task << GPIOTE_CONFIG_MODE_Pos) & GPIOTE_CONFIG_MODE_Msk) |
                             ((pin << GPIOTE_CONFIG_PSEL_Pos) & GPIOTE_CONFIG_PSEL_Msk) |
@@ -312,12 +337,15 @@ void init_ppi() {
     const uint32_t GPIO_CH0 = 0;
     const uint32_t GPIO_CH1 = 1;
     const uint32_t GPIO_CH2 = 2;
+    const uint32_t GPIO_CH3 = 3;
     const uint32_t PPI_CH0 = 10;
     const uint32_t PPI_CH1 = 11;
     const uint32_t PPI_CH2 = 12;
+    const uint32_t PPI_CH3 = 13;
     gpiote_out_init(GPIO_CH0, 10, GPIOTE_CONFIG_POLARITY_Toggle, GPIOTE_CONFIG_OUTINIT_Low); // ready
     gpiote_out_init(GPIO_CH1, 11, GPIOTE_CONFIG_POLARITY_Toggle, GPIOTE_CONFIG_OUTINIT_Low); // address
     gpiote_out_init(GPIO_CH2, 12, GPIOTE_CONFIG_POLARITY_Toggle, GPIOTE_CONFIG_OUTINIT_Low); // end
+    gpiote_out_init(GPIO_CH3, 13, GPIOTE_CONFIG_POLARITY_Toggle, GPIOTE_CONFIG_OUTINIT_Low); // disabled
 
     NRF_PPI->CH[PPI_CH0].EEP = (uint32_t) &(NRF_RADIO->EVENTS_READY);
     NRF_PPI->CH[PPI_CH0].TEP = (uint32_t) &(NRF_GPIOTE->TASKS_OUT[GPIO_CH0]);
@@ -328,13 +356,12 @@ void init_ppi() {
     NRF_PPI->CH[PPI_CH2].EEP = (uint32_t) &(NRF_RADIO->EVENTS_END);
     NRF_PPI->CH[PPI_CH2].TEP = (uint32_t) &(NRF_GPIOTE->TASKS_OUT[GPIO_CH2]);
 
-    NRF_PPI->CHENSET = (1 << PPI_CH0) | (1 << PPI_CH1) | (1 << PPI_CH2);
+    NRF_PPI->CH[PPI_CH3].EEP = (uint32_t) &(NRF_RADIO->EVENTS_DISABLED);
+    NRF_PPI->CH[PPI_CH3].TEP = (uint32_t) &(NRF_GPIOTE->TASKS_OUT[GPIO_CH3]);
+
+    NRF_PPI->CHENSET = (1 << PPI_CH0) | (1 << PPI_CH1) | (1 << PPI_CH2) | (1 << PPI_CH3);
 }
 
-
-uint32_t low_mask(uint8_t n) {
-  return (1<<(n+1)) - 1;
-}
 
 
 void uart0_handler(void)
@@ -377,6 +404,7 @@ void rng_handler(void)
 void radio_handler(void)
 {
     isr_radio(0);
+    rio_isr_radio();
 }
 
 void mayfly_enable_cb(uint8_t caller_id, uint8_t callee_id, uint8_t enable)

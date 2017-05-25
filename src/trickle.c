@@ -5,6 +5,7 @@
 #include "trickle.h"
 #include "tx.h"
 #include "slice.h"
+#include "rio.h"
 
 
 // PhoenixxLL
@@ -47,17 +48,17 @@ uint8_t tx_packet[MAX_PACKET_LEN];
 /////////////
 
 void
-request_transmission(trickle_t *trickle);
+schedule_transmission(trickle_t *trickle);
 void
 trickle_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context);
 void
 prepare_transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context);
 void
 transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context);
-void
-toggle_line(uint32_t line);
 uint32_t
 rand_range(uint32_t min, uint32_t max);
+void
+start_instance(trickle_t *instance, uint8_t user_id);
 
 uint32_t
 read_uint32(uint8_t *bytes) {
@@ -97,6 +98,7 @@ trickle_init(struct trickle_t *instances, uint32_t n) {
             .version = 0,
 
             .ticker_id = trickle_config.first_ticker_id + i*TICKER_PER_TRICKLE,
+
         };
     }
 }
@@ -114,12 +116,20 @@ trickle_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, voi
     // Set the next interval
     trickle_next_interval(trickle);
 
-    ticker_stop(RADIO_TICKER_INSTANCE_ID_RADIO // instance
+    /** PROBLEM
+     * Failure to stop ticker timer seems to lead to failure to also start it.
+     */
+
+    uint32_t err = ticker_stop(RADIO_TICKER_INSTANCE_ID_RADIO // instance
             , MAYFLY_CALL_ID_0 // user
             , trickle->ticker_id // id
             , 0, 0); // operation fp & context
+    if (err == TICKER_STATUS_FAILURE) {
+        printf("# ERROR in trickle_timeout");
+        return;
+    }
 
-    uint32_t err = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO // instance
+    err = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO // instance
         , MAYFLY_CALL_ID_0 // user
         , trickle->ticker_id // ticker id
         , ticker_ticks_now_get() // anchor point
@@ -133,87 +143,24 @@ trickle_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, voi
         , 0 // op func
         , 0 // op context
         );
-
     ASSERT(err != TICKER_STATUS_FAILURE);
 
-    request_transmission(trickle);
-
-    // radio_disable();
+    schedule_transmission(trickle);
 }
 
 
 
-void
-reset_timers(trickle_t *trickle, uint8_t user_id) {
-    // Stop periodic timer
-    ticker_stop(RADIO_TICKER_INSTANCE_ID_RADIO // instance
-            , user_id // user
-            , trickle->ticker_id // id
-            , 0, 0); // operation fp & context
 
-    // Start periodic timer
-    uint32_t retval = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO // instance
-        , user_id // user
-        , trickle->ticker_id // ticker id
-        , ticker_ticks_now_get() // anchor point
-        , TICKER_US_TO_TICKS(trickle_config.interval_min_us) // first interval
-        , TICKER_US_TO_TICKS(trickle_config.interval_min_us) // periodic interval
-        , TICKER_REMAINDER(trickle_config.interval_min_us) // remainder
-        , 0 // lazy
-        , 0 // slot
-        , trickle_timeout // timeout callback function
-        , trickle // context
-        , 0 // op func
-        , 0 // op context
-        );
-    
-    request_transmission(trickle);
-}
 
 void
-request_transmission(trickle_t *trickle) {
-    // Stop an eventual previous timer (TODO not sure if this will work)
-    ticker_stop(RADIO_TICKER_INSTANCE_ID_RADIO // instance
-            , MAYFLY_CALL_ID_0 // user
-            , trickle->ticker_id + 1 // id
-            , 0, 0); // operation fp & context
+schedule_transmission(trickle_t *trickle) {
     uint32_t random_transmit_time = rand_range(trickle->interval/2, trickle->interval - TRANSMISSION_TIME_US);
     uint32_t retval = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO // instance
         , MAYFLY_CALL_ID_0 // user
         , trickle->ticker_id + 1 // ticker id
         , ticker_ticks_now_get() // anchor point
         , TICKER_US_TO_TICKS(random_transmit_time) // first interval
-        , TICKER_US_TO_TICKS(TRANSMIT_TRY_INTERVAL_US) // periodic interval
-        , TICKER_REMAINDER(TRANSMIT_TRY_INTERVAL_US) // remainder
-        , 0 // lazy
-        , TICKER_US_TO_TICKS(TRANSMISSION_PREPARE_TIME_US + TRANSMISSION_TIME_US) // slot
-        , prepare_transmit_timeout // timeout callback function
-        , trickle // context
-        , 0 // op func
-        , 0 // op context
-        );
-    // TODO there should be a decision point whether or not to send - hence perhaps no slot at this point
-}
-
-void
-prepare_transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context) {
-    trickle_t *trickle = (trickle_t *) context;
-
-    // Need to give the PhoenixLL scanner a chance to 'cleanup'
-    radio_role_disable();
-
-    // The timer has done its job... schedule transmission
-    ticker_stop(RADIO_TICKER_INSTANCE_ID_RADIO // instance
-            , MAYFLY_CALL_ID_0 // user
-            , trickle->ticker_id + 1 // id
-            , 0, 0); // operation fp & context
-
-    uint32_t retval = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO // instance
-        , MAYFLY_CALL_ID_0 // user
-        , trickle->ticker_id + 2 // ticker id
-        , ticks_at_expire // anchor point
-        , TICKER_US_TO_TICKS(TRANSMISSION_PREPARE_TIME_US) // first interval
-        , 0 // periodic interval not needed - one-shot with no slot
+        , 0 // periodic interval
         , 0 // remainder
         , 0 // lazy
         , 0 // slot
@@ -226,34 +173,12 @@ prepare_transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t 
 
 void
 transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context) {
-    toggle_line(22);
-    ASSERT(radio_role() == 0);
-    radio_reset();
-
-    //10-11-12-16
-    {
-        NRF_GPIO->OUTCLR = (1 << 10) | (1 << 11) | (1 << 12);
-        if(lazy == 0) {
-            
-        } else if (lazy == 1) {
-            NRF_GPIO->OUTSET = (1 << 10);
-        } else if (lazy == 2) {
-            NRF_GPIO->OUTSET = (1 << 11);
-        } else if (lazy == 3) {
-            NRF_GPIO->OUTSET = (1 << 10) | (1 << 11);
-        } else if (lazy == 4) {
-            NRF_GPIO->OUTSET = (1 << 12);
-        } else if (lazy == 5) {
-            NRF_GPIO->OUTSET = (1 << 10) | (1 << 12);
-        } else if (lazy == 6) {
-            NRF_GPIO->OUTSET = (1 << 11) | (1 << 12);
-        } else {
-            NRF_GPIO->OUTSET = (1 << 10) | (1 << 11) | (1 << 12);
-        }
-        NRF_GPIO->OUT ^= (1 << 16);
-    }
-
     trickle_t *trickle = (trickle_t *) context;
+    // The timer has done its job...
+    ticker_stop(RADIO_TICKER_INSTANCE_ID_RADIO // instance
+            , MAYFLY_CALL_ID_0 // user
+            , trickle->ticker_id + 1 // id
+            , 0, 0); // operation fp & context
 
     // Packet structure:
     // |----------+---------|
@@ -266,10 +191,16 @@ transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, vo
     // | val      | val_len |
     // |----------+---------|
 
-    uint8_t *packet_ptr = tx_packet;
-    packet_ptr += PDU_HDR_LEN + DEV_ADDR_LEN;
+    packet_t *packet = rio_tx_start_packet();
+    if (!packet) {
+        // outbox is full
+        return;
+    }
 
-    uint8_t *packet_start_ptr = packet_ptr;
+    // packet_ptr moves forward as we write
+    uint8_t *packet_ptr = packet->data;
+    packet_ptr += PDU_HDR_LEN + DEV_ADDR_LEN;
+    uint8_t *payload_start_ptr = packet_ptr;
 
     // Version
     write_uint32(packet_ptr, trickle->version);
@@ -286,24 +217,43 @@ transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, vo
     memcpy(&packet_ptr[1], val.ptr, val.len);
     packet_ptr += 1 + val.len;
     
-    write_pdu_header(PDU_TYPE_ADV_IND, packet_ptr - packet_start_ptr, addr_type, dev_addr, tx_packet);
-    // Transmission
-    start_hfclk();
-    configure_radio(tx_packet, 37, ADV_CH37);
+    write_pdu_header(PDU_TYPE_ADV_IND, packet_ptr - payload_start_ptr, addr_type, dev_addr, packet->data);
 
-    if(trickle->c_count < trickle_config.c_threshold){
-        NRF_GPIO->OUTSET = (1 << 1);
-        transmit(tx_packet, ADV_CH37);
-        NRF_GPIO->OUTCLR = (1 << 1);        
-    }
-    // Set c counter to 0. 
-    trickle->c_count = 0;
+    rio_tx_finalize_packet(packet);
+    toggle_line(22);
 
-    // The timer has done its job...
-    ticker_stop(RADIO_TICKER_INSTANCE_ID_RADIO // instance
-            , MAYFLY_CALL_ID_0 // user
-            , trickle->ticker_id + 1 // id
+}
+
+void
+reset_timers(trickle_t *trickle, uint8_t user_id) {
+    // Stop periodic timer
+    uint32_t err = ticker_stop(RADIO_TICKER_INSTANCE_ID_RADIO // instance
+            , user_id // user
+            , trickle->ticker_id // id
             , 0, 0); // operation fp & context
+    if (err == TICKER_STATUS_FAILURE) {
+        printf("# ERROR in reset_timers");
+        return;
+    }
+
+    // Start periodic timer
+    err = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO // instance
+        , user_id // user
+        , trickle->ticker_id // ticker id
+        , ticker_ticks_now_get() // anchor point
+        , TICKER_US_TO_TICKS(trickle_config.interval_min_us) // first interval
+        , TICKER_US_TO_TICKS(trickle_config.interval_min_us) // periodic interval
+        , TICKER_REMAINDER(trickle_config.interval_min_us) // remainder
+        , 0 // lazy
+        , 0 // slot
+        , trickle_timeout // timeout callback function
+        , trickle // context
+        , 0 // op func
+        , 0 // op context
+        );
+    ASSERT(err != TICKER_STATUS_FAILURE);
+    
+    schedule_transmission(trickle);
 }
 
 
@@ -396,7 +346,8 @@ trickle_pdu_handle(uint8_t *packet_ptr, uint8_t packet_len) {
     trickle_t *instance = trickle_config.get_instance_fp(key);
     if (instance) {
         if (version > instance->version) {
-            printf("External (key: "); print_slice(key); printf(", val: "); print_slice(val); printf(")\n");
+            // printf("External (key: "); print_slice(key); printf(", val: "); print_slice(val); printf(")\n");
+            toggle_line(23);
         }
         value_register(instance, key, val, version, MAYFLY_CALL_ID_PROGRAM);
     }
@@ -404,8 +355,7 @@ trickle_pdu_handle(uint8_t *packet_ptr, uint8_t packet_len) {
 
 void
 trickle_value_write(trickle_t *instance, slice_t key, slice_t val, uint8_t user_id) {
-    printf("Internal (key: "); print_slice(key); printf(", val: "); print_slice(val); printf(")\n");
-    printf("Version: %d!\n", instance->version);
+    // printf("Internal (key: "); print_slice(key); printf(", val: "); print_slice(val); printf(")\n");
 
     slice_t old_val = trickle_config.get_val_fp((uint8_t *)instance);
     if (memcmp(val.ptr, old_val.ptr, val.len) || instance->version == 0) {
@@ -414,10 +364,6 @@ trickle_value_write(trickle_t *instance, slice_t key, slice_t val, uint8_t user_
     }
 }
 
-uint32_t
-get_t_value(trickle_t *trickle){
-    return rand(trickle->interval/2, trickle->interval-1);
-}
 
 uint32_t
 rand_range(uint32_t min, uint32_t max) {

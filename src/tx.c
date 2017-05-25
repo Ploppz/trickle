@@ -14,7 +14,7 @@ void start_hfclk() {
     NRF_CLOCK->TASKS_HFCLKSTART = 1;
     while (NRF_CLOCK->EVENTS_HFCLKSTARTED == 0) {}
 }
-void configure_radio(uint8_t* packet_ptr, uint8_t bt_channel, uint8_t rf_channel) {
+void configure_radio(uint8_t bt_channel, uint8_t rf_channel, uint32_t access_address) {
   NRF_RADIO->PCNF0 = (6 << RADIO_PCNF0_LFLEN_Pos) | 
                      (1 << RADIO_PCNF0_S0LEN_Pos) |
                      (2 << RADIO_PCNF0_S1LEN_Pos);
@@ -24,12 +24,11 @@ void configure_radio(uint8_t* packet_ptr, uint8_t bt_channel, uint8_t rf_channel
                      (3 << RADIO_PCNF1_BALEN_Pos) |
                      (RADIO_PCNF1_ENDIAN_Little << RADIO_PCNF1_ENDIAN_Pos) |
                      (1 << RADIO_PCNF1_WHITEEN_Pos);
-  NRF_RADIO->PACKETPTR = (uint32_t)packet_ptr;
   NRF_RADIO->FREQUENCY = freq_mhz(rf_channel) - FREQ_BASE;
   NRF_RADIO->TXPOWER = RADIO_TXPOWER_TXPOWER_0dBm;
   NRF_RADIO->MODE = RADIO_MODE_MODE_Ble_1Mbit;
 
-  set_address0(0x8E89BED6);
+  set_address0(access_address);
 
   NRF_RADIO->TXADDRESS = 0; // BASE0 + PREFIX0
   NRF_RADIO->RXADDRESSES = 0b1;
@@ -119,7 +118,7 @@ void set_address0(uint32_t address) {
   uint32_t base = address << 8;
   NRF_RADIO->BASE0 = base;
   uint32_t prefix = (address >> 24) & low_mask(8);
-  NRF_RADIO->PREFIX0 = prefix;\
+  NRF_RADIO->PREFIX0 = prefix;
 }
 
 uint32_t freq_mhz(uint8_t channel) {
