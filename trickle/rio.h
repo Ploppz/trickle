@@ -27,23 +27,35 @@ struct rio_config_t {
 typedef struct rio_config_t rio_config_t;
 
 
+/* Application should not touch `state`.
+ */
 struct packet_t {
     uint8_t data[MAX_PACKET_LEN];
+    uint8_t rssi;
     uint8_t state;
-    uint8_t rssi; // used only for RX
 };
 typedef struct packet_t packet_t;
 
+/* Needs to be defined by application
+ */
 extern rio_config_t rio_config;
 
+/* Must be called by application in the radio ISR handler.
+ */
 void
 rio_isr_radio();
 
+/* Initialize module
+ */
 void 
 rio_init();
 
-// TX
-/* Push new packet to outbox. Packet should be written to `packet_t->data`. */
+////////
+// TX //
+////////
+
+/* Push new packet to outbox. Packet should be written to `packet_t->data`.
+ */
 packet_t *
 rio_tx_start_packet();
 
@@ -53,10 +65,15 @@ rio_tx_start_packet();
 void
 rio_tx_finalize_packet(packet_t *packet);
 
-// RX
+////////
+// RX //
+////////
+
+/* Get the first packet in the `inbox` queue.
+ * The scanner will overwrite the start of the queue when the queue gets full.
+ * So either process it fast or make sure you have a long enough queue.
+ */
 packet_t *
 rio_rx_get_packet();
-void
-rio_rx_free_packet(packet_t *packet);
 
 #endif

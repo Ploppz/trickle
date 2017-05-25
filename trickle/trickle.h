@@ -19,22 +19,25 @@ struct trickle_t;
 typedef uint32_t trickle_version_t;
 typedef uint16_t trickle_app_id_t;
 
+/* The following functions should be implemented by application and provided in
+ * `trickle_config`.
+ */
 
-// get_key:
+
+/* Should write the key associated with given `instance`, to `dest`.
+ * Returns number of bytes written.
+ */
 typedef uint8_t             (*trickle_get_key_fp_t)     (uint8_t *instance, uint8_t *dest);
-// get_data: If data is not present, register it...
+
+/* Should return the value (ptr, len) associated with an instance.
+ */
 typedef slice_t             (*trickle_get_val_fp_t)     (uint8_t *instance);
-// get_instance: If key is not found, this function should initialize a trickle struct
+
+/* If key is not found, this function should initialize a trickle struct
+ */
 typedef struct trickle_t *  (*trickle_get_instance_fp_t)(slice_t key);
 
 
-// unused atm.
-typedef struct __attribute__((packed)) {
-    uint32_t version;
-    uint8_t  key_len;
-    uint8_t  val_len;
-    uint8_t  data[1];
-} trickle_pdu_t;
 
 typedef struct {
     // Trickle config
@@ -54,6 +57,9 @@ typedef struct {
     uint32_t max_tx_time_us;
 } trickle_config_t;
 
+
+/* trickle_config must be defined by the application
+ */
 extern trickle_config_t trickle_config;
 
 
@@ -70,15 +76,8 @@ trickle_pdu_handle(uint8_t *packet_ptr, uint8_t packet_len);
 void
 trickle_value_write(struct trickle_t *instance, slice_t key, slice_t val, uint8_t user_id);
 
-// TODO no idea why there is not a linker error.... investigate!
-uint32_t 
-rand(int min, int max);
 
-uint32_t
-get_t_value(struct trickle_t *trickle);
-
-
-// Serializing
+// Serializing (should probably be private)
 
 uint32_t
 read_uint32(uint8_t *src);
