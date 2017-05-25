@@ -98,7 +98,6 @@ trickle_init(struct trickle_t *instances, uint32_t n) {
             .version = 0,
 
             .ticker_id = trickle_config.first_ticker_id + i*TICKER_PER_TRICKLE,
-
         };
     }
 }
