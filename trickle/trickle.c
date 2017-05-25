@@ -119,7 +119,6 @@ trickle_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, voi
 void
 transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context) {
     trickle_t *trickle = (trickle_t *) context;
-    printf("Transmit\n");
     // The timer has done its job...
     ticker_stop(RADIO_TICKER_INSTANCE_ID_RADIO // instance
             , MAYFLY_CALL_ID_0 // user
@@ -162,12 +161,14 @@ transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, vo
     packet_ptr[0] =    val.len;
     memcpy(&packet_ptr[1], val.ptr, val.len);
     packet_ptr += 1 + val.len;
+
+    // Debug.. TODO remove
+    NRF_GPIO->OUT ^= 1 << 10;
     
     write_pdu_header(PDU_TYPE_ADV_IND, packet_ptr - payload_start_ptr, addr_type, dev_addr, packet->data);
 
     rio_tx_finalize_packet(packet);
     toggle_line(22);
-
 }
 
 void
@@ -204,7 +205,6 @@ reset_timers(trickle_t *trickle, uint8_t user_id) {
     
 
 
-    printf("Schedule transmission\n");
     /* Stop old transmission timer & start new */
     err = ticker_stop(RADIO_TICKER_INSTANCE_ID_RADIO // instance
             , MAYFLY_CALL_ID_0 // user
@@ -283,6 +283,7 @@ value_register(trickle_t *instance, slice_t key, slice_t new_val, trickle_versio
         memcpy(val.ptr, new_val.ptr, new_val.len);
 
         instance->interval = trickle_config.interval_min_us;
+        printf("RESET TIMERS\n");
         reset_timers(instance, user_id);
     } else {
         instance->c_count ++;

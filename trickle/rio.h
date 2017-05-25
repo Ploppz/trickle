@@ -6,7 +6,7 @@
  * A current shortcoming is thus that it will work well with other
  * applications that require radio sharing.
  *
- * Inbox for scanning and outbox for transmitting, are circular buffers.
+ * Inbox for scanning and Outbox for transmitting, are circular buffers.
  *
  * If inbox gets full, the oldest packet gets overwritten.
  *   - earlier attempt with a "grabage" flag was risky because of context-unsafety
@@ -43,8 +43,13 @@ void
 rio_init();
 
 // TX
+/* Push new packet to outbox. Packet should be written to `packet_t->data`. */
 packet_t *
 rio_tx_start_packet();
+
+/* Signal that the packet is done. Must be done before transmission.
+ * If not done, the outbox will stall forever...
+ */
 void
 rio_tx_finalize_packet(packet_t *packet);
 

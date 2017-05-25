@@ -101,6 +101,15 @@ positioning_get_val(uint8_t *instance) {
     get_double_index(instance, &i, &j);
     ASSERT(i < N_TRICKLE_NODES);
     ASSERT(j < N_TRICKLE_NODES);
+
+    {
+        // For logic test - can be removed (TODO)
+        // Assuming 3 nodes, 9 indices.. just write to lines 11-14 a kind of instance 'id'
+        uint32_t id = ((i & 0b11) << 2) | (j & 0b11);
+        NRF_GPIO->OUTSET = (id << 11);
+        NRF_GPIO->OUTCLR = ((~id & 0b1111) << 11);
+        int a = 0;
+    }
     return new_slice(&values[i][j], 1);
 }
 
