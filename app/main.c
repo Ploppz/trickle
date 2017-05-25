@@ -56,6 +56,7 @@ static uint8_t ALIGNED(4) rng[3 + 4 + 1];
 #define TICKER_ID_TRICKLE (RIO_TICKER_NODES+1)
 
 
+
 ////////////
 // Config //
 ////////////
@@ -65,12 +66,16 @@ static uint8_t ALIGNED(4) rng[3 + 4 + 1];
 #define CAT_(x, y) x ## y
 #define APP_FN(FN_NAME) CAT(CAT(APP_NAME, _), FN_NAME)
 
+#define MAX_TX_TIME_US 5 * 1e3
+
 trickle_config_t trickle_config = {
-    .interval_min_us = 500 * 1e3,
-    .interval_max_us = 10 * 1e6,
+    .interval_min_us = 100  * 1e3,
+    .interval_max_us = 4    * 1e6,
     .c_threshold = 2,
     
-    .first_ticker_id =  TICKER_ID_TRICKLE,
+    .first_ticker_id = TICKER_ID_TRICKLE,
+    
+    .max_tx_time_us = MAX_TX_TIME_US,
 
     .get_key_fp = &APP_FN(get_key),
     .get_val_fp = &APP_FN(get_val),
@@ -82,6 +87,7 @@ rio_config_t rio_config = {
     .bt_channel  = 5,
     .rf_channel  = CH_INDEX5,
     .access_addr = 0x84215142,
+    .update_interval_us = MAX_TX_TIME_US - 1000,
 };
 
 //////////////////
@@ -181,7 +187,7 @@ int main(void)
 
     irq_priority_set(RADIO_IRQn, 0xFD);
     irq_enable(RADIO_IRQn);
-    rio_init(10000);
+    rio_init();
 
     APP_FN(init)();
     APP_FN(run)();
@@ -245,7 +251,7 @@ positioning_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy,
 void
 positioning_run() {
     // Start timer just to have some means of getting data out
-    const uint32_t PERIOD_S = 10;
+    const uint32_t PERIOD_S = 5;
     uint32_t err = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO // instance
         , MAYFLY_CALL_ID_PROGRAM // user
         , TICKER_ID_APP // ticker id
@@ -260,10 +266,8 @@ positioning_run() {
     ASSERT(!err);
 
 
-
-
     // Listen for packets
-    // Discard meaningless packets (self <-> self)
+    // Discard meaningless packets (self <-> self) (this is done inside positioning)
     while (1) { 
         // Wait for incoming packet
         packet_t *in_packet = 0;
@@ -281,6 +285,7 @@ positioning_run() {
 
         if (is_positioning_node(&in_packet->data[PDU_HDR_LEN])) {
             uint8_t rssi = in_packet->rssi;
+            printf("RSSI %d\n", rssi);
             positioning_register_rssi(rssi, &in_packet->data[PDU_HDR_LEN]);
         }
 
@@ -317,10 +322,10 @@ void init_ppi() {
     const uint32_t PPI_CH1 = 11;
     const uint32_t PPI_CH2 = 12;
     const uint32_t PPI_CH3 = 13;
-    gpiote_out_init(GPIO_CH0, 10, GPIOTE_CONFIG_POLARITY_Toggle, GPIOTE_CONFIG_OUTINIT_Low); // ready
-    gpiote_out_init(GPIO_CH1, 11, GPIOTE_CONFIG_POLARITY_Toggle, GPIOTE_CONFIG_OUTINIT_Low); // address
-    gpiote_out_init(GPIO_CH2, 12, GPIOTE_CONFIG_POLARITY_Toggle, GPIOTE_CONFIG_OUTINIT_Low); // end
-    gpiote_out_init(GPIO_CH3, 13, GPIOTE_CONFIG_POLARITY_Toggle, GPIOTE_CONFIG_OUTINIT_Low); // disabled
+    gpiote_out_init(GPIO_CH0, 21, GPIOTE_CONFIG_POLARITY_Toggle, GPIOTE_CONFIG_OUTINIT_Low); // ready
+    gpiote_out_init(GPIO_CH1, 22, GPIOTE_CONFIG_POLARITY_Toggle, GPIOTE_CONFIG_OUTINIT_Low); // address
+    gpiote_out_init(GPIO_CH2, 23, GPIOTE_CONFIG_POLARITY_Toggle, GPIOTE_CONFIG_OUTINIT_Low); // end
+    gpiote_out_init(GPIO_CH3, 24, GPIOTE_CONFIG_POLARITY_Toggle, GPIOTE_CONFIG_OUTINIT_Low); // disabled
 
     NRF_PPI->CH[PPI_CH0].EEP = (uint32_t) &(NRF_RADIO->EVENTS_READY);
     NRF_PPI->CH[PPI_CH0].TEP = (uint32_t) &(NRF_GPIOTE->TASKS_OUT[GPIO_CH0]);

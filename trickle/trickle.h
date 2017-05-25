@@ -49,6 +49,9 @@ typedef struct {
     trickle_get_key_fp_t        get_key_fp;
     trickle_get_val_fp_t        get_val_fp;
     trickle_get_instance_fp_t   get_instance_fp;
+
+    // Other
+    uint32_t max_tx_time_us;
 } trickle_config_t;
 
 extern trickle_config_t trickle_config;

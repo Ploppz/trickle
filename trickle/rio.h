@@ -22,6 +22,7 @@ struct rio_config_t {
     uint8_t bt_channel;
     uint8_t rf_channel;
     uint32_t access_addr;
+    uint32_t update_interval_us;
 };
 typedef struct rio_config_t rio_config_t;
 
@@ -39,7 +40,7 @@ void
 rio_isr_radio();
 
 void 
-rio_init(uint32_t interval_us);
+rio_init();
 
 // TX
 packet_t *

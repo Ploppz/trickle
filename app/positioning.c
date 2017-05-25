@@ -171,7 +171,7 @@ positioning_print() {
     // Print matrix of values
     for (uint32_t row = 0; row < n_addresses; row ++) {
         for (uint32_t col = 0; col < n_addresses; col ++) {
-            printf("%x", values[row][col]);
+            printf("%d", values[row][col]);
             if (col != n_addresses-1) {
                 printf(", ");
             }

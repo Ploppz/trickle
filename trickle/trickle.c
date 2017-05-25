@@ -48,17 +48,15 @@ uint8_t tx_packet[MAX_PACKET_LEN];
 /////////////
 
 void
-schedule_transmission(trickle_t *trickle);
-void
 trickle_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context);
-void
-prepare_transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context);
 void
 transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context);
 uint32_t
 rand_range(uint32_t min, uint32_t max);
 void
 start_instance(trickle_t *instance, uint8_t user_id);
+void
+reset_timers(trickle_t *trickle, uint8_t user_id);
 
 uint32_t
 read_uint32(uint8_t *bytes) {
@@ -114,65 +112,14 @@ trickle_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, voi
     toggle_line(21);
     // Set the next interval
     trickle_next_interval(trickle);
-
-    /** PROBLEM
-     * Failure to stop ticker timer seems to lead to failure to also start it.
-     */
-
-    uint32_t err = ticker_stop(RADIO_TICKER_INSTANCE_ID_RADIO // instance
-            , MAYFLY_CALL_ID_0 // user
-            , trickle->ticker_id // id
-            , 0, 0); // operation fp & context
-    if (err == TICKER_STATUS_FAILURE) {
-        printf("# ERROR in trickle_timeout");
-        return;
-    }
-
-    err = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO // instance
-        , MAYFLY_CALL_ID_0 // user
-        , trickle->ticker_id // ticker id
-        , ticker_ticks_now_get() // anchor point
-        , TICKER_US_TO_TICKS(trickle->interval) // first interval
-        , TICKER_US_TO_TICKS(trickle->interval) // periodic interval
-        , TICKER_REMAINDER(trickle->interval) // remainder
-        , 0 // lazy
-        , 0 // slot
-        , trickle_timeout // timeout callback function
-        , trickle // context
-        , 0 // op func
-        , 0 // op context
-        );
-    ASSERT(err != TICKER_STATUS_FAILURE);
-
-    schedule_transmission(trickle);
+    reset_timers(trickle, MAYFLY_CALL_ID_0);
 }
 
-
-
-
-
-void
-schedule_transmission(trickle_t *trickle) {
-    uint32_t random_transmit_time = rand_range(trickle->interval/2, trickle->interval - TRANSMISSION_TIME_US);
-    uint32_t retval = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO // instance
-        , MAYFLY_CALL_ID_0 // user
-        , trickle->ticker_id + 1 // ticker id
-        , ticker_ticks_now_get() // anchor point
-        , TICKER_US_TO_TICKS(random_transmit_time) // first interval
-        , 0 // periodic interval
-        , 0 // remainder
-        , 0 // lazy
-        , 0 // slot
-        , transmit_timeout // timeout callback function
-        , trickle // context
-        , 0 // op func
-        , 0 // op context
-        );
-}
 
 void
 transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *context) {
     trickle_t *trickle = (trickle_t *) context;
+    printf("Transmit\n");
     // The timer has done its job...
     ticker_stop(RADIO_TICKER_INSTANCE_ID_RADIO // instance
             , MAYFLY_CALL_ID_0 // user
@@ -225,7 +172,11 @@ transmit_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, vo
 
 void
 reset_timers(trickle_t *trickle, uint8_t user_id) {
-    // Stop periodic timer
+    /* Update periodic timer */
+
+    /** PROBLEM
+     * Failure to stop ticker timer seems to lead to failure to also start it.
+     */
     uint32_t err = ticker_stop(RADIO_TICKER_INSTANCE_ID_RADIO // instance
             , user_id // user
             , trickle->ticker_id // id
@@ -235,14 +186,13 @@ reset_timers(trickle_t *trickle, uint8_t user_id) {
         return;
     }
 
-    // Start periodic timer
     err = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO // instance
         , user_id // user
         , trickle->ticker_id // ticker id
         , ticker_ticks_now_get() // anchor point
-        , TICKER_US_TO_TICKS(trickle_config.interval_min_us) // first interval
-        , TICKER_US_TO_TICKS(trickle_config.interval_min_us) // periodic interval
-        , TICKER_REMAINDER(trickle_config.interval_min_us) // remainder
+        , TICKER_US_TO_TICKS(trickle->interval) // first interval
+        , TICKER_US_TO_TICKS(trickle->interval) // periodic interval
+        , TICKER_REMAINDER(trickle->interval) // remainder
         , 0 // lazy
         , 0 // slot
         , trickle_timeout // timeout callback function
@@ -252,7 +202,31 @@ reset_timers(trickle_t *trickle, uint8_t user_id) {
         );
     ASSERT(err != TICKER_STATUS_FAILURE);
     
-    schedule_transmission(trickle);
+
+
+    printf("Schedule transmission\n");
+    /* Stop old transmission timer & start new */
+    err = ticker_stop(RADIO_TICKER_INSTANCE_ID_RADIO // instance
+            , MAYFLY_CALL_ID_0 // user
+            , trickle->ticker_id + 1 // id
+            , 0, 0); // operation fp & context
+
+    uint32_t random_transmit_time = rand_range(trickle->interval/2, trickle->interval - trickle_config.max_tx_time_us);
+    err = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO // instance
+        , MAYFLY_CALL_ID_0 // user
+        , trickle->ticker_id + 1 // ticker id
+        , ticker_ticks_now_get() // anchor point
+        , TICKER_US_TO_TICKS(random_transmit_time) // first interval
+        , 0 // periodic interval
+        , 0 // remainder
+        , 0 // lazy
+        , 0 // slot
+        , transmit_timeout // timeout callback function
+        , trickle // context
+        , 0 // op func
+        , 0 // op context
+        );
+    // ASSERT(err != TICKER_STATUS_FAILURE);
 }
 
 

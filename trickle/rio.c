@@ -303,7 +303,7 @@ rio_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *c
 ///////////////
 
 void 
-rio_init(uint32_t interval_us) {
+rio_init() {
     clear_radio_events();
     NRF_RADIO->SHORTS   = 0;
     NRF_RADIO->INTENCLR = ~0;
@@ -323,9 +323,9 @@ rio_init(uint32_t interval_us) {
         , MAYFLY_CALL_ID_PROGRAM // user
         , 0 // ticker id
         , ticker_ticks_now_get() // anchor point
-        , TICKER_US_TO_TICKS(interval_us) // first interval
-        , TICKER_US_TO_TICKS(interval_us) // periodic interval
-        , TICKER_REMAINDER(interval_us) // remainder
+        , TICKER_US_TO_TICKS(rio_config.update_interval_us) // first interval
+        , TICKER_US_TO_TICKS(rio_config.update_interval_us) // periodic interval
+        , TICKER_REMAINDER(rio_config.update_interval_us) // remainder
         , 0 // lazy
         , 0 // slot
         , rio_timeout // timeout callback function
