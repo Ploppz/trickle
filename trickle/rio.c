@@ -297,18 +297,6 @@ rio_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *c
     }
 }
 
-// TODO unused.. needed?
-void
-rio_schedule_tx() {
-    packet_t *packet = outbox_front();
-    if (packet == 0 || packet->state == TX_TRANSMITTING) {
-        return;
-    }
-
-    packet->state = TX_TRANSMITTING;
-
-    NRF_RADIO->TASKS_TXEN   = 1;
-}
 
 ///////////////
 // Interface //

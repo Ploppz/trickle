@@ -1,4 +1,5 @@
 #include "trickle.h"
+#include "positioning.h"
 
 // PhoenixLL
 #include "mayfly.h"
@@ -40,7 +41,7 @@ positioning_init() {
     uint8_t val_data = 0;
     slice_t val = new_slice(&val_data, 1);
 
-    struct trickle_t *instance = trickle_config.get_instance_fp(key);
+    struct trickle_t *instance = positioning_get_instance(key);
     ASSERT(instance);
     trickle_value_write(instance, key, val, MAYFLY_CALL_ID_PROGRAM);
 }
@@ -136,8 +137,7 @@ positioning_register_rssi(uint8_t rssi, uint8_t *other_dev_addr) {
     make_key(key_data, dev_addr, other_dev_addr);
     slice_t key = new_slice(key_data, sizeof(key_data));
 
-    struct trickle_t *instance = trickle_config.get_instance_fp(key);
-    // RSSI will only get registered if it comes from a device running the positioning app
+    struct trickle_t *instance = positioning_get_instance(key);
     if (instance) {
         slice_t val = new_slice(&rssi, 1);
         trickle_value_write(instance, key, val, MAYFLY_CALL_ID_PROGRAM);

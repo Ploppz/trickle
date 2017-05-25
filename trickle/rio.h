@@ -8,8 +8,14 @@
  *
  * Inbox for scanning and outbox for transmitting, are circular buffers.
  *
- * If inbox gets full, the oldest packet gets deleted.
- * If outbox gets full, it will busy wait (?) (TODO)
+ * If inbox gets full, the oldest packet gets overwritten.
+ *   - earlier attempt with a "grabage" flag was risky because of context-unsafety
+ * If outbox gets full, pushing a packet will return 0
+ *
+ * At the moment, hence:
+ *   - Main context pushes outbox, pops inbox
+ *   - ISR context pushes inbox, pops outbox
+ * And it's presumably not 100% context-safe yet.
  */
 
 struct rio_config_t {
@@ -34,6 +40,7 @@ rio_isr_radio();
 
 void 
 rio_init(uint32_t interval_us);
+
 // TX
 packet_t *
 rio_tx_start_packet();
