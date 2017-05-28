@@ -37,10 +37,10 @@ typedef struct rio_config_t rio_config_t;
 
 /** \brief Struct used for storing incoming and outgoing packets. 
 *
-* \param    data[]                  Array that contains packet data.
+* \param    data                    Array that contains packet data.
 * \param    rssi                    Rssi value of incoming packets.
-* \param    state                   Says if the packet is ready for processing,
-*                                   is being processed, or have been processed
+* \param    state                   Used only internally, should not be touched by
+*                                   application.
 */
 struct packet_t {
     uint8_t data[MAX_PACKET_LEN];
@@ -71,8 +71,8 @@ void
 rio_init(void);
 
 
-/** \brief Pushes a new packet to outbox. Packet should be written to `packet_t->data`.
-*
+/** \brief  Pushes a new packet to outbox. Packet should be written to `packet_t->data`.
+*   \return Packet to which to write. Remember to call `rio_tx_finalize_packet` when done.
 */
 packet_t *
 rio_tx_start_packet(void);
@@ -82,16 +82,16 @@ rio_tx_start_packet(void);
 /** \brief Changes the state of the packet to signal that it is complete.
 *          Must be called before transmission.
 *
-* param[in] packet                  Pointer to packet that is going to be 
+* param[in] packet                  Pointer to packet should to be 
 *                                   transmitted.
 */
 void
 rio_tx_finalize_packet(packet_t *packet);
 
 
-/** \brief Gets the first packet in the inbox queue. The scanned wil overwrite
-*          the start of the queue when the queue gets full. 
-*
+/** \brief  Gets the first packet in the inbox queue. The scanner will overwrite
+*           the start of the queue when the queue gets full. 
+*   \return NULL if no packet, else the first received packet in the queue.
 */
 packet_t *
 rio_rx_get_packet(void);

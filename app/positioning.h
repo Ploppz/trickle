@@ -13,16 +13,18 @@ positioning_init(void);
 /** \brief Generate key based on the index of the trickle instance in the 
 *          `instances` array. Returns number of bytes written do `dest`.
 *
-* /param[in]  instance                Pointer to trickle instance.
-* /param[in]  dest                    Pointer to where the key wil be written.    (?)
+* \param[in]  instance                Pointer to trickle_t instance.
+* \param[in]  dest                    Pointer to where the key wil be written.
+* \return                             Number of bytes written to dest
 */
 uint8_t
 positioning_get_key(uint8_t *instance, uint8_t *dest);
 
 
-/** \brief (?)
+/** \brief Get the value associated with a trickle instance
 *
-* /param[in]  instance              Pointer to trickle instance.
+* \param[in]  instance              Pointer to trickle_t instance.
+* \return                           Slice with ptr to read or write value.
 */
 slice_t
 positioning_get_val(uint8_t *instance);

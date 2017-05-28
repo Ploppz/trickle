@@ -19,33 +19,28 @@ struct trickle_t;
 typedef uint32_t trickle_version_t;
 typedef uint16_t trickle_app_id_t;
 
-/* The following functions should be implemented by application and provided in
- * `trickle_config`.
- */
+// The application should implement the following function prototypes, provided
+// via `trickle_config`.
 
 
 /** \brief Should write the key associated with given `instance`, to `dest`.
 *          Returns number of bytes written.
-*               
 */
 typedef uint8_t             (*trickle_get_key_fp_t)     (uint8_t *instance, uint8_t *dest);
 
 
 /** \brief Should return the value (ptr, len) associated with an instance.
-*
 */
 typedef slice_t             (*trickle_get_val_fp_t)     (uint8_t *instance);
 
 
 /** \brief If key is not found, this function should initialize a trickle struct.
-*
 */
 typedef struct trickle_t *  (*trickle_get_instance_fp_t)(slice_t key);
 
 
 /** \brief Trickle configuration struct. Stores information about 
 *          the trickle application. 
-*
 */
 typedef struct {
     // Trickle config
@@ -93,18 +88,16 @@ trickle_pdu_handle(uint8_t *packet_ptr, uint8_t packet_len);
 
 /** \brief Writes new data to an instance. Increments the version number. 
 *
-* \param[in]  instance              Pointer to trickle instance.
-* \param[in]  key                   Key to where data will be stored.  (?)
-* \param[in]  val                   Value of new data.
-* \param[in]  user_id               Priority level context for ticker timer. 
+* \param[in]  instance              Pointer to trickle_t instance.
+* \param[in]  key                   Key of the instance (to avoid having to look it up again).
+* \param[in]  val                   New value.
+* \param[in]  user_id               Mayfly context/user ID of caller. 
 */
 void
 trickle_value_write(struct trickle_t *instance, slice_t key, slice_t val, uint8_t user_id);
 
 
 // Serializing (should probably be private)
-
-// Documentation for desse og? (?)
 uint32_t
 read_uint32(uint8_t *src);
 void
