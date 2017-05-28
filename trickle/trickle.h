@@ -24,21 +24,29 @@ typedef uint16_t trickle_app_id_t;
  */
 
 
-/* Should write the key associated with given `instance`, to `dest`.
- * Returns number of bytes written.
- */
+/** \brief Should write the key associated with given `instance`, to `dest`.
+*          Returns number of bytes written.
+*               
+*/
 typedef uint8_t             (*trickle_get_key_fp_t)     (uint8_t *instance, uint8_t *dest);
 
-/* Should return the value (ptr, len) associated with an instance.
- */
+
+/** \brief Should return the value (ptr, len) associated with an instance.
+*
+*/
 typedef slice_t             (*trickle_get_val_fp_t)     (uint8_t *instance);
 
-/* If key is not found, this function should initialize a trickle struct
- */
+
+/** \brief If key is not found, this function should initialize a trickle struct.
+*
+*/
 typedef struct trickle_t *  (*trickle_get_instance_fp_t)(slice_t key);
 
 
-
+/** \brief Trickle configuration struct. Stores information about 
+*          the trickle application. 
+*
+*/
 typedef struct {
     // Trickle config
     uint32_t interval_min_us;
@@ -58,27 +66,45 @@ typedef struct {
 } trickle_config_t;
 
 
-/* trickle_config must be defined by the application
- */
+/** \brief trickle_config must be defined by the application
+*
+*/
 extern trickle_config_t trickle_config;
 
 
-
-// Initialize an array of trickle instances
+/** \brief Initialization of trickle module. Initializes an array of trickle
+*          instances. 
+*
+* \param[in]  instances             Pointer to array storing trickle instances.    (?)
+* \param[in]  n                     Number of trickle instances. 
+*/
 void
 trickle_init(struct trickle_t *instances, uint32_t n);
 
-// Handle incoming trickle packet
+
+/** \brief Handles incoming trickle packets. 
+*
+* \param[in]  packet_ptr            Pointer to packet. 
+* \param[in]  packet_len            Length of packet. 
+*/
 void
 trickle_pdu_handle(uint8_t *packet_ptr, uint8_t packet_len);
 
-// Write new data to an instance, incrementing the version number.
+
+/** \brief Writes new data to an instance. Increments the version number. 
+*
+* \param[in]  instance              Pointer to trickle instance.
+* \param[in]  key                   Key to where data will be stored.  (?)
+* \param[in]  val                   Value of new data.
+* \param[in]  user_id               Priority level context for ticker timer. 
+*/
 void
 trickle_value_write(struct trickle_t *instance, slice_t key, slice_t val, uint8_t user_id);
 
 
 // Serializing (should probably be private)
 
+// Documentation for desse og? (?)
 uint32_t
 read_uint32(uint8_t *src);
 void
@@ -89,6 +115,10 @@ void
 write_uint16(uint8_t *dest, uint16_t src);
 
 
+/** \brief Toggles a line. Used for debugging. 
+*
+* \param[in]  line                  Pin number that will be toggled. 
+*/
 void
 toggle_line(uint32_t line);
 

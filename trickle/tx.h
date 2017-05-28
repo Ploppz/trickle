@@ -60,14 +60,45 @@ typedef enum {
 #define DEV_ADDR_LEN 6
 
 // (probably not needed in this project, as it's done by PhoenixLL
-void configure_radio(uint8_t bt_channel, uint8_t rf_channel, uint32_t access_address);
-void start_hfclk();
+/** \brief Configures the radio for scanning and transmitting.
+*
+* \param[in]  bt_channel            Bluetooth channel used by the radio.
+* \param[in]  rf_channel            Radio frequency used by the radio.
+* \param[in]  access_address        Access address used by the radio.
+*/
+void 
+configure_radio(uint8_t bt_channel, uint8_t rf_channel, uint32_t access_address);
 
+
+/** \brief Starts the high frequency clock needed by the radio. 
+*
+*/
+void 
+start_hfclk(void);
+
+/** \brief Makes the packet header, and puts it in the destination array. 
+*
+* \param[in]  pdu_type              Specifies the type of the packet.
+* \param[in]  data_len              Length of data.
+* \param[in]  address_type          Public or random address. 
+* \param[in]  dev_addr              Pointer to device address. 
+* \param[in]  dest                  Pointer to packet array where the header 
+*                                   will be placed.
+*/
 void
 write_pdu_header(uint8_t pdu_type, uint32_t data_len, address_type_t address_type, uint8_t *dev_addr, uint8_t *dest);
-void transmit(uint8_t *adv_packet, uint8_t rf_channel);
 
 
+/** \brief Sets frequency and packet pointer. Transmits the packet. 
+*
+* \param[in]  adv_packet            Pointer to packet that will be sent. 
+* \param[in]  rf_channel            Frequency on which the radio will broadcast.
+*/
+void 
+transmit(uint8_t *adv_packet, uint8_t rf_channel);
+
+
+//Dokumentasjon til desse og?  (?)
 uint32_t low_mask(uint8_t n);
 void set_address0(uint32_t address);
 uint32_t freq_mhz(uint8_t channel);

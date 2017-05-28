@@ -34,7 +34,7 @@ static uint32_t inbox_tail       = 0;
 
 /* len functions for testing.. */
 uint32_t
-outbox_len() {
+outbox_len(void) {
     if (outbox_head <= outbox_tail) {
         return outbox_tail - outbox_head;
     } else {
@@ -42,7 +42,7 @@ outbox_len() {
     }
 }
 uint32_t
-inbox_len() {
+inbox_len(void) {
     if (inbox_head <= inbox_tail) {
         return inbox_tail - inbox_head;
     } else {
@@ -51,7 +51,7 @@ inbox_len() {
 }
 
 packet_t *
-outbox_push() {
+outbox_push(void) {
     uint32_t next_outbox_tail = (outbox_tail+1) % RIO_N_PACKETS;
     if (next_outbox_tail == outbox_head) {
         // Full buffer
@@ -66,7 +66,7 @@ outbox_push() {
 
 // If front is only allocated, not complete or transmitting, return 0.
 packet_t *
-outbox_front() {
+outbox_front(void) {
     if (outbox_head == outbox_tail || outbox[outbox_head].state == TX_ALLOCATED) {
         return 0;
     } else {
@@ -76,7 +76,7 @@ outbox_front() {
 
 // If front is only allocated, not complete or transmitting, nothing happens.
 void
-outbox_pop_front() {
+outbox_pop_front(void) {
     if (outbox_head == outbox_tail || outbox[outbox_head].state == TX_ALLOCATED) {
         // EMPTY
     } else {
@@ -85,7 +85,7 @@ outbox_pop_front() {
 }
 
 uint8_t
-outbox_pending() {
+outbox_pending(void) {
     return outbox_head != outbox_tail
         && outbox[outbox_head].state == TX_COMPLETE;
     /* Previous code: outbox_len
@@ -99,7 +99,7 @@ outbox_pending() {
 }
 
 packet_t *
-inbox_push() {
+inbox_push(void) {
     uint32_t next_inbox_tail = (inbox_tail+1) % RIO_N_PACKETS;
     ASSERT(next_inbox_tail != inbox_head);
     if (next_inbox_tail == inbox_head) {
@@ -115,7 +115,7 @@ inbox_push() {
 // Inbox..
 
 packet_t *
-inbox_front() {
+inbox_front(void) {
     if (inbox_head == inbox_tail || inbox[inbox_head].state != RX_COMPLETE) {
         return 0;
     } else {
@@ -124,7 +124,7 @@ inbox_front() {
 }
 
 packet_t *
-inbox_back() {
+inbox_back(void) {
     uint32_t tail = (inbox_tail + RIO_N_PACKETS - 1) % RIO_N_PACKETS;
     if (inbox_head == inbox_tail) {
         return 0;
@@ -134,7 +134,7 @@ inbox_back() {
 }
 
 packet_t *
-inbox_pop_front() {
+inbox_pop_front(void) {
     if (inbox_head == inbox_tail || inbox[inbox_head].state != RX_COMPLETE) {
         // EMPTY
     } else {
@@ -159,7 +159,7 @@ typedef enum state_t state_t;
 static state_t state = STATE_NONE;
 
 void
-rx_new_packet() {
+rx_new_packet(void) {
     packet_t *packet = inbox_push();
     NRF_RADIO->PACKETPTR = (uint32_t) packet->data;
 }
@@ -172,7 +172,7 @@ check_event(volatile uint32_t *event) {
 }
 
 void
-clear_radio_events() {
+clear_radio_events(void) {
     NRF_RADIO->EVENTS_READY = 0;   
     NRF_RADIO->EVENTS_ADDRESS = 0; 
     NRF_RADIO->EVENTS_PAYLOAD = 0; 
@@ -187,7 +187,7 @@ clear_radio_events() {
 
 
 void
-rio_isr_radio() {
+rio_isr_radio(void) {
     if (state == STATE_TX) {
         ASSERT(NRF_RADIO->STATE != RADIO_STATE_STATE_Rx
             && NRF_RADIO->STATE != RADIO_STATE_STATE_RxIdle);
@@ -303,7 +303,7 @@ rio_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy, void *c
 ///////////////
 
 void 
-rio_init() {
+rio_init(void) {
     clear_radio_events();
     NRF_RADIO->SHORTS   = 0;
     NRF_RADIO->INTENCLR = ~0;
@@ -339,7 +339,7 @@ rio_init() {
 
 
 packet_t *
-rio_tx_start_packet() {
+rio_tx_start_packet(void) {
     // Pop packets that radio has transmitted - done here because of context safety
 
     return outbox_push();
@@ -353,6 +353,6 @@ rio_tx_finalize_packet(packet_t *packet) {
 
 
 packet_t *
-rio_rx_get_packet() {
+rio_rx_get_packet(void) {
     return inbox_pop_front();
 }
