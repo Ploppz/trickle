@@ -37,7 +37,7 @@ instance -> val
 
 Furthermore, it's up to the application to scan for packets and pass them to trickle for registration and appropriate action.
 
-The application allocates all the memory for instances and values. As for the `key -> instance` lookup, the application will typically not allocate space for all the keys, but employ a more memory efficient, domain specific access structure. The positioning application is a good example of how we only need to store a maximum of $N \times 6$ bytes for key lookup despite a total of $N^2$ keys, each of length $12$ (disregarding the `app_id`, shortly to be discussed).
+The application allocates all the memory for instances and values. As for the `key -> instance` lookup, the application will typically not allocate space for all the keys, but employ a more memory efficient, domain specific access structure. The positioning application is a good example of how we only need to store a maximum of `N * 6` bytes for key lookup despite a total of `N^2` keys, each of length `12` (disregarding the `app_id`, shortly to be discussed).
 
 Using the positioning application as an illustrative example, keys have the following structure.
  2      | 6         | 6         
@@ -51,7 +51,7 @@ Due to problems with Ticker, we tried to limit the number of tickers in use. Pho
 
 `rio` is a module that does radio exclusively, with only one ticker in total as it doesn't rely on Ticker time slots. It has circular buffers `inbox` and `outbox` for packets received and to be transmitted, respectively. It scans by default, but starts transmitting when it needs to.
 
-It is not a good solution to not use Ticker slots, as that was a big part of the rationale behind this project. However, we had to have something working by the end of the semester.
+It would be advantageous to use Ticker slots, which was a big part of the rationale behind this project. However, with the short timeframe of this project, we did not find time to fully address the Ticker problems encountered. `rio` only limits the problem, making the product usable for now.
 
 We have gone to some length to ensure context safety, but not sure whether it's context safe at the moment - we haven't encountered any problems with it yet. Main contex pops `inbox` and pushes `outbox`, while ISR context pops `outbox` and pushes `inbox`.
 
