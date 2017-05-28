@@ -2,48 +2,63 @@
 #define POSITIONING_H
 #include "trickle.h"
 
-/* Initialize positioning module. This will call `trickle_init`.
- */
+
+/** \brief Initialize positioning module. Will also call `trickle_init`.
+*
+*/
 void
-positioning_init();
+positioning_init(void);
 
 
-
-// Interface for Trickle. Look in documentation at trickle.h
-
-/* (See trickle docs)
- */
+/** \brief Generate key based on the index of the trickle instance in the 
+*          `instances` array. Returns number of bytes written do `dest`.
+*
+* /param[in]  instance                Pointer to trickle instance.
+* /param[in]  dest                    Pointer to where the key wil be written.    (?)
+*/
 uint8_t
 positioning_get_key(uint8_t *instance, uint8_t *dest);
 
-/* (See trickle docs)
- */
+
+/** \brief (?)
+*
+* /param[in]  instance              Pointer to trickle instance.
+*/
 slice_t
 positioning_get_val(uint8_t *instance);
 
-/* (See trickle docs)
- * BEWARE: Will register the addresses contained in the key if they are not
- * already registered in the internal `addresses` array.
- */
+
+/** \brief Returns trickle instance based on key. Will register addresses 
+*          contained if they are not already registered in the internal 
+*          `addresses` array.
+*
+* \param[in]  key                   Key generated from trickle instances. 
+*/
 struct trickle_t*
 positioning_get_instance(slice_t key);
 
 
-
-
-// Other functions for application:
-
-/* Registers the RSSI between this device and `other_dev_addr`, via Trickle.
- * I.e. updates the value.
- */
+/** \brief Registers read RSSI value to trickle instance. 
+*
+* \param[in] rssi                   RSSI value read incoming packet.
+* \param[in] other_dev_addr         Address of packet sender. 
+*/
 void
 positioning_register_rssi(uint8_t rssi, uint8_t *other_dev_addr);
 
-/* Returns 1 iff `addr` is registered as a device which sends positioning packets.
- */
+
+/** \brief Returns 1 if `addr` is registered as a device which sends 
+*          positioning packets.
+*
+* \param[in] addr                   Address of packet recieved. 
+*/
 uint8_t
 is_positioning_node(uint8_t *addr);
 
+
+/** \brief Prints out stored trickle data. Used for debugging.
+*
+*/
 void
-positioning_print();
+positioning_print(void);
 #endif

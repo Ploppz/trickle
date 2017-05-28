@@ -18,6 +18,14 @@
  * And it's presumably not 100% context-safe yet.
  */
 
+
+/** \brief  Struct that stores information about radio configuration. 
+* 
+* \param    bt_channel              Bluetooth channel used.
+* \param    rf_channel              Radio frequency used.
+* \param    access_addr             Access address used.
+* \param    update_interval_us      Interval for timer that checks outbox. 
+*/
 struct rio_config_t {
     uint8_t bt_channel;
     uint8_t rf_channel;
@@ -27,8 +35,13 @@ struct rio_config_t {
 typedef struct rio_config_t rio_config_t;
 
 
-/* Application should not touch `state`.
- */
+/** \brief Struct used for storing incoming and outgoing packets. 
+*
+* \param    data[]                  Array that contains packet data.
+* \param    rssi                    Rssi value of incoming packets.
+* \param    state                   Says if the packet is ready for processing,
+*                                   is being processed, or have been processed
+*/
 struct packet_t {
     uint8_t data[MAX_PACKET_LEN];
     uint8_t rssi;
@@ -36,44 +49,51 @@ struct packet_t {
 };
 typedef struct packet_t packet_t;
 
-/* Needs to be defined by application
- */
+
+/** \brief Needs to be defined by application
+*
+*/
 extern rio_config_t rio_config;
 
-/* Must be called by application in the radio ISR handler.
- */
+
+/** \brief Function called by radio ISR handler. Handles incoming and outgoing
+*          packets.
+*
+*/
 void
-rio_isr_radio();
+rio_isr_radio(void);
 
-/* Initialize module
- */
+
+/** \brief Rio module initialization. 
+*
+*/
 void 
-rio_init();
+rio_init(void);
 
-////////
-// TX //
-////////
 
-/* Push new packet to outbox. Packet should be written to `packet_t->data`.
- */
+/** \brief Pushes a new packet to outbox. Packet should be written to `packet_t->data`.
+*
+*/
 packet_t *
-rio_tx_start_packet();
+rio_tx_start_packet(void);
 
-/* Signal that the packet is done. Must be done before transmission.
- * If not done, the outbox will stall forever...
- */
+
+
+/** \brief Changes the state of the packet to signal that it is complete.
+*          Must be called before transmission.
+*
+* param[in] packet                  Pointer to packet that is going to be 
+*                                   transmitted.
+*/
 void
 rio_tx_finalize_packet(packet_t *packet);
 
-////////
-// RX //
-////////
 
-/* Get the first packet in the `inbox` queue.
- * The scanner will overwrite the start of the queue when the queue gets full.
- * So either process it fast or make sure you have a long enough queue.
- */
+/** \brief Gets the first packet in the inbox queue. The scanned wil overwrite
+*          the start of the queue when the queue gets full. 
+*
+*/
 packet_t *
-rio_rx_get_packet();
+rio_rx_get_packet(void);
 
 #endif

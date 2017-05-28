@@ -8,7 +8,7 @@ void set_address0(uint32_t address);
 uint32_t freq_mhz(uint8_t channel);
 void override_mode();
 
-void start_hfclk() {
+void start_hfclk(void) {
     // Enable HFCLK
     NRF_CLOCK->EVENTS_HFCLKSTARTED = 0;
     NRF_CLOCK->TASKS_HFCLKSTART = 1;
@@ -67,7 +67,7 @@ write_pdu_header(uint8_t pdu_type, uint32_t data_len, address_type_t address_typ
     }
 }
 
-void disable_radio() {
+void disable_radio(void) {
     // If not already disabled, disable radio
     switch (NRF_RADIO->STATE) {
         case 0:
@@ -126,7 +126,7 @@ uint32_t freq_mhz(uint8_t channel) {
 }
 
 
-void override_mode() {
+void override_mode(void) {
     uint32_t override_val = NRF_FICR->OVERRIDEEN & FICR_OVERRIDEEN_BLE_1MBIT_Msk;
 
     if (override_val == FICR_OVERRIDEEN_BLE_1MBIT_Override) {

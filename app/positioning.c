@@ -29,7 +29,7 @@ static uint32_t n_addresses = 0;
 extern uint8_t dev_addr[6];
 
 void
-positioning_init() {
+positioning_init(void) {
     trickle_init((struct trickle_t*)instances, N_TRICKLE_NODES * N_TRICKLE_NODES);
     // Start first instance - a meaningless self<->self RSSI just to give other nodes some packets
     uint8_t key_data[KEY_LEN];
@@ -164,7 +164,7 @@ is_positioning_node(uint8_t *address) {
 }
 
 void
-positioning_print() {
+positioning_print(void) {
     printf("\n =Trickle data=\n\n");
     // Print addresses
     for (uint32_t i = 0; i < n_addresses; i ++) {
