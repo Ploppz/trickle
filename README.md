@@ -55,6 +55,13 @@ It would be advantageous to use Ticker slots, which was a big part of the ration
 
 We have gone to some length to ensure context safety, but not sure whether it's context safe at the moment - we haven't encountered any problems with it yet. Main contex pops `inbox` and pushes `outbox`, while ISR context pops `outbox` and pushes `inbox`.
 
+## Diagrams
+### Reception
+![rx](http://i.imgur.com/2P9RIu6.png)
+
+### Transmission
+![tx](http://i.imgur.com/sDrhnJF.png)
+
 # Current Ticker problems
 The Ticker problems before `rio` were mostly `ticker_start` and `ticker_update` returning `TICKER_STATUS_FAILURE`. Having memory for 30 user ops didn't eliminate the problems.
 
