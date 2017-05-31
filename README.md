@@ -11,7 +11,7 @@ Open `positioning.emProject` in Segger Embedded Studio. After building (`F7`), y
 # Overview
 ### Features
 * Instances are identified by variable-size keys -> there is _logically_ no limit to the number of instances (disregarding the Ticker limitations), and it is convenient for identifying instances.
-* 98% radio uptime (tested with [this](https://github.com/JarlV/Mesh-Testing)).
+* Up to 98% radio uptime (tested with [this](https://github.com/JarlV/Mesh-Testing)).
 ### Limitations
 * Ticker time slots are not used, so `trickle` can't reasonably be used in conjunction with other apps that use the radio. This ought to change.
 * Two ticker timers are used per trickle instance. Hence there cannot be any more than 127 trickle instances. In the future, Ticker timers should not be used for this.
