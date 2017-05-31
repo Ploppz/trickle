@@ -1,20 +1,35 @@
 # Trickle
-The goal of the trickle algorithm is to distribute the latest version of some value/data.
+Library that implements the Trickle algorithm. Currently tested only on `nRF51 422xxAC`. The Trickle algorithm runs on a mesh network of ICs, and its goal is to distribute the latest version of some value/data.
 
 _Instance_ in this text means a running instance of a trickle algorithm. It has an associated ticker for scheduling events, a version number, a value and a (possibly implicit) key.
 
 ## Getting started
-Open `positioning.emProject` in Segger Embedded Studio. After building (`F7`), you can use `flash.py` (in linux: `./flash.py positioning`) to flash all boards that are connected with USB. Start one board in debug mode by pressing `F5` and then press `F5` to run. The local state will be written to a debug window in Segger Embedded Studio every 5 second.
+To build this project you will need access to the PhoenixLL repository, which is not a given.
+
+Open `positioning.emProject` in Segger Embedded Studio. After building (`F7`), you can use `flash.py` (in linux: `./flash.py positioning`) to flash all boards that are connected with USB. Start one board in debug mode by pressing `F5` and then press `F5` to run. The local state will be written to a debug window in Segger Embedded Studio every 2 second.
+
+### File structure
+
+```
+trickle
+├── app
+│   └── Contains a main file along with code for example applications.
+├── trickle
+│   └── Contains the source code of the Trickle library
+└── PhoenixLL
+    └── A dependency of `Trickle`, but currently not open source.
+```
 
 `main.c` uses an application from the `app` directory based on the preprocessor definition `APP_NAME`, which is "positioning" in the positioning emProject. The `toggle` project is an experiment that is not very useful (and not finished or maintained, an artifact) but a good starting point for an application which has one instance per node, for example a network for measuring temperature.
 
 # Overview
 ### Features
+* Flexible: it's relatively easy to make a new application on top of `Tricke`, and the library is agnostic of domain specific things such as memory layout and logic for mapping between keys and instances (explained below).
 * Instances are identified by variable-size keys -> there is _logically_ no limit to the number of instances (disregarding the Ticker limitations), and it is convenient for identifying instances.
 * Up to 98% radio uptime (tested with [this](https://github.com/JarlV/Mesh-Testing)).
 ### Limitations
 * Ticker time slots are not used, so `trickle` can't reasonably be used in conjunction with other apps that use the radio. This ought to change.
-* Two ticker timers are used per trickle instance. Hence there cannot be any more than 127 trickle instances. In the future, Ticker timers should not be used for this.
+* Two tickers are used per trickle instance. Hence there cannot be any more than 127 trickle instances. In the future, tickers should not be used for this.
 * There is no mechanism to push out inactive instances. Like for example the cache as in [bcast-mesh](https://github.com/NordicSemiconductor/nRF51-ble-bcast-mesh).
 
 # Architecture
