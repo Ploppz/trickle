@@ -283,7 +283,6 @@ value_register(trickle_t *instance, slice_t key, slice_t new_val, trickle_versio
         memcpy(val.ptr, new_val.ptr, new_val.len);
 
         instance->interval = trickle_config.interval_min_us;
-        printf("RESET TIMERS\n");
         reset_timers(instance, user_id);
     } else {
         instance->c_count ++;

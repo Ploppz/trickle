@@ -251,7 +251,7 @@ positioning_timeout(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy,
 void
 positioning_run() {
     // Start timer just to have some means of getting data out
-    const uint32_t PERIOD_S = 5;
+    const uint32_t PERIOD_S = 2;
     uint32_t err = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO // instance
         , MAYFLY_CALL_ID_PROGRAM // user
         , TICKER_ID_APP // ticker id
@@ -285,7 +285,7 @@ positioning_run() {
 
         if (is_positioning_node(&in_packet->data[PDU_HDR_LEN])) {
             uint8_t rssi = in_packet->rssi;
-            printf("RSSI %d\n", rssi);
+            // printf("RSSI %d\n", rssi);
             positioning_register_rssi(rssi, &in_packet->data[PDU_HDR_LEN]);
         }
 

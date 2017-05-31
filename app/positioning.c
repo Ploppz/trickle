@@ -165,7 +165,7 @@ is_positioning_node(uint8_t *address) {
 
 void
 positioning_print(void) {
-    printf("\n =Trickle data=\n\n");
+    printf("\n =Registered addresses=\n\n");
     // Print addresses
     for (uint32_t i = 0; i < n_addresses; i ++) {
         for (uint8_t j = 0; j < 6; j ++) {
@@ -174,9 +174,10 @@ positioning_print(void) {
                 printf(", ");
             }
         }
+        printf("\n");
     }
-    printf("\n");
 
+    printf("\n =Trickle data=\n\n");
     // Print matrix of values
     for (uint32_t row = 0; row < n_addresses; row ++) {
         for (uint32_t col = 0; col < n_addresses; col ++) {
@@ -189,5 +190,4 @@ positioning_print(void) {
         printf("\n");
     }
     printf("\n");
-    printf("\n =End Trickle data=\n\n");
 }
